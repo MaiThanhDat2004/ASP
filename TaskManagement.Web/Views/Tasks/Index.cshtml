@@ -1,0 +1,805 @@
+﻿@model IEnumerable<TaskManagement.Web.Models.TaskItem>
+
+@{
+    ViewData["Title"] = "Danh sách công việc";
+
+    var tasks = Model?.ToList() ?? new List<TaskManagement.Web.Models.TaskItem>();
+    var users = ViewBag.Users as Dictionary<int, string> ?? new Dictionary<int, string>();
+
+    var totalTasks = tasks.Count;
+    var todoTasks = tasks.Count(t => t.Status == "ToDo");
+    var doingTasks = tasks.Count(t => t.Status == "Doing");
+    var doneTasks = tasks.Count(t => t.Status == "Done");
+    var overdueTasks = tasks.Count(t => t.Deadline < DateTime.Now && t.Status != "Done");
+
+    var currentSearch = ViewBag.SearchString as string;
+    var currentStatus = ViewBag.StatusFilter as string;
+    var currentPriority = ViewBag.PriorityFilter as string;
+
+    int currentPage = ViewBag.Page ?? 1;
+    int pageSize = ViewBag.PageSize ?? 5;
+    int totalItems = ViewBag.TotalItems ?? 0;
+    int totalPages = ViewBag.TotalPages ?? 1;
+}
+
+<style>
+    .stat-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 20px 22px;
+        transition: transform .2s, box-shadow .2s;
+        position: relative;
+        overflow: hidden;
+    }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: 14px 14px 0 0;
+        }
+
+        .stat-card.total::before {
+            background: #6366f1;
+        }
+
+        .stat-card.todo::before {
+            background: #94a3b8;
+        }
+
+        .stat-card.doing::before {
+            background: #f59e0b;
+        }
+
+        .stat-card.done::before {
+            background: #10b981;
+        }
+
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        margin-bottom: 12px;
+    }
+
+        .stat-icon.total {
+            background: rgba(99,102,241,0.1);
+            color: #6366f1;
+        }
+
+        .stat-icon.todo {
+            background: rgba(148,163,184,0.15);
+            color: #64748b;
+        }
+
+        .stat-icon.doing {
+            background: rgba(245,158,11,0.1);
+            color: #f59e0b;
+        }
+
+        .stat-icon.done {
+            background: rgba(16,185,129,0.1);
+            color: #10b981;
+        }
+
+    .stat-value {
+        font-size: 28px;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 4px;
+    }
+
+    .stat-label {
+        font-size: 13px;
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    .section-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        overflow: hidden;
+    }
+
+    .section-header {
+        padding: 18px 22px;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+        .section-header h5 {
+            font-size: 15px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .section-header p {
+            font-size: 12px;
+            color: #94a3b8;
+            margin: 2px 0 0;
+        }
+
+    .section-body {
+        padding: 20px 22px;
+    }
+
+    /* Filter */
+    .filter-form .form-control,
+    .filter-form .form-select {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 13.5px;
+        padding: 8px 12px;
+        background: #f8fafc;
+        color: #0f172a;
+        transition: border .2s, box-shadow .2s;
+    }
+
+        .filter-form .form-control:focus,
+        .filter-form .form-select:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+            background: #fff;
+            outline: none;
+        }
+
+    .filter-form .form-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        margin-bottom: 6px;
+    }
+
+    /* Table */
+    .tasks-table {
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+    }
+
+        .tasks-table thead th {
+            background: #f8fafc;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+            color: #64748b;
+            padding: 11px 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+            .tasks-table thead th:first-child {
+                border-radius: 8px 0 0 0;
+            }
+
+            .tasks-table thead th:last-child {
+                border-radius: 0 8px 0 0;
+            }
+
+        .tasks-table tbody tr {
+            transition: background .15s;
+        }
+
+            .tasks-table tbody tr:hover td {
+                background: #f8fafc;
+            }
+
+        .tasks-table tbody td {
+            padding: 13px 16px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 14px;
+            vertical-align: middle;
+        }
+
+        .tasks-table tbody tr.overdue td {
+            background: #fef2f2 !important;
+        }
+
+        .tasks-table tbody tr.overdue:hover td {
+            background: #fee2e2 !important;
+        }
+
+    .task-title {
+        font-weight: 600;
+        color: #0f172a;
+        font-size: 14px;
+    }
+
+    .task-desc {
+        font-size: 12.5px;
+        color: #94a3b8;
+        margin-top: 2px;
+    }
+
+    .overdue-tag {
+        font-size: 11px;
+        color: #ef4444;
+        font-weight: 600;
+    }
+
+    /* Badges */
+    .status-badge, .priority-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+        .status-badge::before, .priority-badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+    .status-todo {
+        background: #f1f5f9;
+        color: #475569;
+    }
+
+        .status-todo::before {
+            background: #94a3b8;
+        }
+
+    .status-doing {
+        background: #fffbeb;
+        color: #92400e;
+    }
+
+        .status-doing::before {
+            background: #f59e0b;
+        }
+
+    .status-done {
+        background: #ecfdf5;
+        color: #065f46;
+    }
+
+        .status-done::before {
+            background: #10b981;
+        }
+
+    .priority-low {
+        background: #ecfeff;
+        color: #155e75;
+    }
+
+        .priority-low::before {
+            background: #06b6d4;
+        }
+
+    .priority-med {
+        background: #eff6ff;
+        color: #1e40af;
+    }
+
+        .priority-med::before {
+            background: #3b82f6;
+        }
+
+    .priority-high {
+        background: #fef2f2;
+        color: #991b1b;
+    }
+
+        .priority-high::before {
+            background: #ef4444;
+        }
+
+    /* Action buttons */
+    .btn-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid transparent;
+        text-decoration: none;
+        transition: all .15s;
+    }
+
+        .btn-action.view {
+            background: #eff6ff;
+            color: #2563eb;
+            border-color: #bfdbfe;
+        }
+
+            .btn-action.view:hover {
+                background: #dbeafe;
+            }
+
+        .btn-action.edit {
+            background: #fffbeb;
+            color: #b45309;
+            border-color: #fde68a;
+        }
+
+            .btn-action.edit:hover {
+                background: #fef3c7;
+            }
+
+        .btn-action.delete {
+            background: #fef2f2;
+            color: #dc2626;
+            border-color: #fecaca;
+        }
+
+            .btn-action.delete:hover {
+                background: #fee2e2;
+            }
+
+    /* Pagination */
+    .pagination-area {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 22px;
+        border-top: 1px solid #f1f5f9;
+        font-size: 13px;
+        color: #64748b;
+    }
+
+    .page-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 7px;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all .15s;
+    }
+
+        .page-btn:hover {
+            background: #f8fafc;
+            border-color: #6366f1;
+            color: #6366f1;
+        }
+
+        .page-btn.active {
+            background: #6366f1;
+            border-color: #6366f1;
+            color: #fff;
+        }
+
+        .page-btn.disabled {
+            opacity: .4;
+            pointer-events: none;
+        }
+
+    .btn-primary-custom {
+        background: #6366f1;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 9px 18px;
+        font-size: 13.5px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        transition: background .2s, transform .15s;
+        cursor: pointer;
+    }
+
+        .btn-primary-custom:hover {
+            background: #4f46e5;
+            color: white;
+            transform: translateY(-1px);
+        }
+
+    .btn-outline-custom {
+        background: transparent;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 9px 18px;
+        font-size: 13.5px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        transition: all .2s;
+        cursor: pointer;
+    }
+
+        .btn-outline-custom:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+            color: #0f172a;
+        }
+
+    .overdue-count-badge {
+        background: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+        border-radius: 20px;
+        padding: 3px 10px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .total-count-badge {
+        background: #f8fafc;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        padding: 3px 10px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .page-heading {
+        font-size: 22px;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    .page-subheading {
+        font-size: 14px;
+        color: #64748b;
+        margin: 4px 0 0;
+    }
+
+    .alert-success-custom {
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        color: #065f46;
+        border-radius: 10px;
+        padding: 12px 16px;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 20px;
+    }
+</style>
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="page-heading">Danh sách công việc</h1>
+        <p class="page-subheading">Theo dõi và quản lý tiến độ công việc của nhóm</p>
+    </div>
+    @if (User.IsInRole("Admin"))
+    {
+        <a asp-action="Create" class="btn-primary-custom">
+            <i class="bi bi-plus-lg"></i> Tạo công việc
+        </a>
+    }
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert-success-custom">
+        <i class="bi bi-check-circle-fill"></i>
+        @TempData["SuccessMessage"]
+    </div>
+}
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="stat-card total">
+            <div class="stat-icon total"><i class="bi bi-stack"></i></div>
+            <div class="stat-value">@totalTasks</div>
+            <div class="stat-label">Tổng công việc</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card todo">
+            <div class="stat-icon todo"><i class="bi bi-circle"></i></div>
+            <div class="stat-value">@todoTasks</div>
+            <div class="stat-label">Cần làm</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card doing">
+            <div class="stat-icon doing"><i class="bi bi-arrow-clockwise"></i></div>
+            <div class="stat-value">@doingTasks</div>
+            <div class="stat-label">Đang thực hiện</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="stat-card done">
+            <div class="stat-icon done"><i class="bi bi-check-circle"></i></div>
+            <div class="stat-value">@doneTasks</div>
+            <div class="stat-label">Hoàn thành</div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart -->
+<div class="section-card mb-4">
+    <div class="section-header">
+        <div>
+            <h5>Biểu đồ trạng thái</h5>
+            <p>Thống kê công việc theo trạng thái hiện tại</p>
+        </div>
+    </div>
+    <div class="section-body">
+        <div style="max-width: 300px; margin: 0 auto;">
+            <canvas id="taskStatusChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Filter -->
+<div class="section-card mb-4">
+    <div class="section-header">
+        <div>
+            <h5>Bộ lọc</h5>
+            <p>Tìm kiếm và lọc công việc theo tiêu chí</p>
+        </div>
+    </div>
+    <div class="section-body">
+        <form asp-action="Index" method="get" class="filter-form">
+            <div class="row g-3 align-items-end">
+                <div class="col-lg-4">
+                    <label class="form-label">Tìm kiếm</label>
+                    <input type="text" name="searchString" value="@currentSearch"
+                           class="form-control" placeholder="Tiêu đề hoặc mô tả..." />
+                </div>
+                <div class="col-lg-2">
+                    <label class="form-label">Trạng thái</label>
+                    <select name="statusFilter" class="form-select">
+                        <option value="">Tất cả</option>
+                        <option value="ToDo" selected="@(currentStatus == "ToDo")">ToDo</option>
+                        <option value="Doing" selected="@(currentStatus == "Doing")">Doing</option>
+                        <option value="Done" selected="@(currentStatus == "Done")">Done</option>
+                    </select>
+                </div>
+                <div class="col-lg-2">
+                    <label class="form-label">Ưu tiên</label>
+                    <select name="priorityFilter" class="form-select">
+                        <option value="">Tất cả</option>
+                        <option value="Low" selected="@(currentPriority == "Low")">Low</option>
+                        <option value="Medium" selected="@(currentPriority == "Medium")">Medium</option>
+                        <option value="High" selected="@(currentPriority == "High")">High</option>
+                    </select>
+                </div>
+                <div class="col-lg-1">
+                    <label class="form-label">Số trang</label>
+                    <select name="pageSize" class="form-select">
+                        <option value="5" selected="@(pageSize == 5)">5</option>
+                        <option value="10" selected="@(pageSize == 10)">10</option>
+                        <option value="15" selected="@(pageSize == 15)">15</option>
+                    </select>
+                </div>
+                <div class="col-lg-3 d-flex gap-2">
+                    <button type="submit" class="btn-primary-custom flex-fill justify-content-center">
+                        <i class="bi bi-funnel"></i> Lọc
+                    </button>
+                    <a asp-action="Index" class="btn-outline-custom flex-fill justify-content-center">
+                        <i class="bi bi-x-lg"></i> Xóa lọc
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="section-card">
+    <div class="section-header">
+        <div>
+            <h5>Bảng công việc</h5>
+            <p>Danh sách các công việc trong hệ thống</p>
+        </div>
+        <div class="d-flex gap-2">
+            @if (overdueTasks > 0)
+            {
+                <span class="overdue-count-badge"><i class="bi bi-exclamation-triangle-fill me-1"></i>Quá hạn: @overdueTasks</span>
+            }
+            <span class="total-count-badge">Tổng: @totalItems</span>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="tasks-table">
+            <thead>
+                <tr>
+                    <th>Tiêu đề</th>
+                    <th>Mô tả</th>
+                    <th>Trạng thái</th>
+                    <th>Ưu tiên</th>
+                    <th>Hạn hoàn thành</th>
+                    <th>Người được giao</th>
+                    <th style="text-align:center;">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (tasks.Any())
+                {
+                    @foreach (var item in tasks)
+                    {
+                        var isOverdue = item.Deadline < DateTime.Now && item.Status != "Done";
+
+                        var statusCls = item.Status switch
+                        {
+                                        "ToDo" => "status-todo",
+                                        "Doing" => "status-doing",
+                                        "Done" => "status-done",
+                            _ => "status-todo"
+                        };
+
+                        var priorityCls = item.Priority switch
+                        {
+                                        "Low" => "priority-low",
+                                        "Medium" => "priority-med",
+                                        "High" => "priority-high",
+                            _ => "priority-low"
+                        };
+
+                        var shortDesc = string.IsNullOrWhiteSpace(item.Description)
+                        ? "Không có mô tả"
+                        : (item.Description.Length > 50 ? item.Description.Substring(0, 50) + "…" : item.Description);
+
+                        <tr class="@(isOverdue ? "overdue" : "")">
+                            <td>
+                                <div class="task-title">@item.Title</div>
+                                @if (isOverdue)
+                                {
+                                    <div class="overdue-tag"><i class="bi bi-exclamation-circle-fill me-1"></i>Quá hạn</div>
+                                }
+                            </td>
+                            <td><span class="task-desc">@shortDesc</span></td>
+                            <td><span class="status-badge @statusCls">@item.Status</span></td>
+                            <td><span class="priority-badge @priorityCls">@item.Priority</span></td>
+                            <td>
+                                <div style="font-size:13.5px; font-weight:600;">@item.Deadline.ToString("dd/MM/yyyy")</div>
+                                <div style="font-size:12px; color:#94a3b8;">@item.Deadline.ToString("HH:mm")</div>
+                            </td>
+                            <td>
+                                @if (item.AssignedTo.HasValue && users.ContainsKey(item.AssignedTo.Value))
+                                {
+                                    <div style="display:flex; align-items:center; gap:7px;">
+                                        <div style="width:26px;height:26px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0;">
+                                            @users[item.AssignedTo.Value].Substring(0, 1).ToUpper()
+                                        </div>
+                                        <span style="font-size:13.5px; font-weight:600;">@users[item.AssignedTo.Value]</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span style="font-size:13px; color:#94a3b8;">Chưa giao</span>
+                                }
+                            </td>
+                            <td>
+                                <div style="display:flex; gap:5px; justify-content:center;">
+                                    <a asp-action="Details" asp-route-id="@item.TaskId" class="btn-action view">
+                                        <i class="bi bi-eye"></i> Chi tiết
+                                    </a>
+                                    @if (User.IsInRole("Admin"))
+                                    {
+                                        <a asp-action="Edit" asp-route-id="@item.TaskId" class="btn-action edit">
+                                            <i class="bi bi-pencil"></i> Sửa
+                                        </a>
+                                        <a asp-action="Delete" asp-route-id="@item.TaskId" class="btn-action delete">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="7" style="text-align:center; padding: 60px 20px;">
+                            <div style="font-size:40px; margin-bottom:12px;">📋</div>
+                            <div style="font-weight:700; color:#0f172a; margin-bottom:6px;">Không tìm thấy công việc</div>
+                            <div style="color:#94a3b8; font-size:13.5px; margin-bottom:16px;">Thử thay đổi bộ lọc hoặc tạo công việc mới</div>
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <a asp-action="Create" class="btn-primary-custom" style="display:inline-flex;">
+                                    <i class="bi bi-plus-lg"></i> Tạo công việc mới
+                                </a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (totalPages > 1)
+    {
+        <div class="pagination-area">
+            <span>Trang <strong>@currentPage</strong> / <strong>@totalPages</strong> — @totalItems bản ghi</span>
+            <div style="display:flex; gap:4px; align-items:center;">
+                <a class="page-btn @(currentPage == 1 ? "disabled" : "")"
+                   asp-action="Index"
+                   asp-route-searchString="@currentSearch"
+                   asp-route-statusFilter="@currentStatus"
+                   asp-route-priorityFilter="@currentPriority"
+                   asp-route-page="@(currentPage - 1)"
+                   asp-route-pageSize="@pageSize">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+
+                @for (int i = 1; i <= totalPages; i++)
+                {
+                    <a class="page-btn @(i == currentPage ? "active" : "")"
+                       asp-action="Index"
+                       asp-route-searchString="@currentSearch"
+                       asp-route-statusFilter="@currentStatus"
+                       asp-route-priorityFilter="@currentPriority"
+                       asp-route-page="@i"
+                       asp-route-pageSize="@pageSize">@i</a>
+                }
+
+                <a class="page-btn @(currentPage == totalPages ? "disabled" : "")"
+                   asp-action="Index"
+                   asp-route-searchString="@currentSearch"
+                   asp-route-statusFilter="@currentStatus"
+                   asp-route-priorityFilter="@currentPriority"
+                   asp-route-page="@(currentPage + 1)"
+                   asp-route-pageSize="@pageSize">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        const ctx = document.getElementById('taskStatusChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['ToDo', 'Doing', 'Done'],
+                    datasets: [{
+                        data: [@todoTasks, @doingTasks, @doneTasks],
+                        backgroundColor: ['#e2e8f0', '#fde68a', '#6ee7b7'],
+                        borderColor: ['#94a3b8', '#f59e0b', '#10b981'],
+                        borderWidth: 2,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    cutout: '68%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { family: 'Plus Jakarta Sans', size: 13 }, padding: 16 } }
+                    }
+                }
+            });
+        }
+    </script>
+}

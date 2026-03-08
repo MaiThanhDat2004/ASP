@@ -1,0 +1,578 @@
+﻿@model TaskManagement.Web.ViewModels.LoginViewModel
+@{
+    ViewData["Title"] = "Đăng nhập";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đăng nhập — TaskFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            background: #0f172a;
+            overflow: hidden;
+        }
+
+        /* ── LEFT PANEL ── */
+        .left-panel {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+            position: relative;
+            overflow: hidden;
+        }
+
+            /* Animated background */
+            .left-panel::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(ellipse 80% 60% at 20% 50%, rgba(99,102,241,0.25) 0%, transparent 60%), radial-gradient(ellipse 60% 80% at 80% 20%, rgba(139,92,246,0.18) 0%, transparent 55%), radial-gradient(ellipse 50% 50% at 60% 80%, rgba(16,185,129,0.1) 0%, transparent 50%);
+            }
+
+        .grid-pattern {
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(rgba(99,102,241,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.08) 1px, transparent 1px);
+            background-size: 48px 48px;
+        }
+
+        .left-content {
+            position: relative;
+            z-index: 1;
+            max-width: 420px;
+            width: 100%;
+        }
+
+        .brand-mark {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 56px;
+        }
+
+        .brand-icon {
+            width: 42px;
+            height: 42px;
+            background: #6366f1;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 0 30px rgba(99,102,241,0.4);
+        }
+
+        .brand-name {
+            font-size: 20px;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.3px;
+        }
+
+            .brand-name span {
+                color: #818cf8;
+            }
+
+        .hero-heading {
+            font-size: 40px;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1.15;
+            letter-spacing: -1px;
+            margin-bottom: 16px;
+        }
+
+            .hero-heading em {
+                font-style: normal;
+                background: linear-gradient(135deg, #818cf8, #a78bfa);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                /* text clip */
+            }
+
+        .hero-sub {
+            font-size: 15px;
+            color: #64748b;
+            line-height: 1.65;
+            margin-bottom: 44px;
+        }
+
+        .feature-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .feature-dot {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            flex-shrink: 0;
+        }
+
+            .feature-dot.green {
+                background: rgba(16,185,129,0.15);
+                color: #10b981;
+            }
+
+            .feature-dot.indigo {
+                background: rgba(99,102,241,0.15);
+                color: #6366f1;
+            }
+
+            .feature-dot.amber {
+                background: rgba(245,158,11,0.15);
+                color: #f59e0b;
+            }
+
+        .feature-text {
+            font-size: 14px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        /* Floating task cards */
+        .floating-cards {
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            opacity: 0.6;
+        }
+
+        .mini-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 10px 14px;
+            width: 200px;
+            backdrop-filter: blur(8px);
+        }
+
+        .mini-card-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #e2e8f0;
+            margin-bottom: 6px;
+        }
+
+        .mini-card-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .mini-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 10px;
+        }
+
+            .mini-badge.done {
+                background: rgba(16,185,129,0.2);
+                color: #34d399;
+            }
+
+            .mini-badge.doing {
+                background: rgba(245,158,11,0.2);
+                color: #fbbf24;
+            }
+
+            .mini-badge.todo {
+                background: rgba(148,163,184,0.2);
+                color: #94a3b8;
+            }
+
+        .mini-avatar {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            font-size: 9px;
+            font-weight: 700;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @@keyframes float-up {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+
+        .floating-cards {
+            animation: float-up 4s ease-in-out infinite;
+        }
+
+        /* ── RIGHT PANEL (Login Form) ── */
+        .right-panel {
+            width: 480px;
+            min-height: 100vh;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 44px;
+            flex-shrink: 0;
+        }
+
+        .login-form-wrap {
+            width: 100%;
+            max-width: 360px;
+        }
+
+        .form-greeting {
+            margin-bottom: 36px;
+        }
+
+            .form-greeting h1 {
+                font-size: 26px;
+                font-weight: 800;
+                color: #0f172a;
+                margin-bottom: 6px;
+                letter-spacing: -0.5px;
+            }
+
+            .form-greeting p {
+                font-size: 14px;
+                color: #64748b;
+            }
+
+        .field-group {
+            margin-bottom: 20px;
+        }
+
+        .field-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: #475569;
+            margin-bottom: 7px;
+        }
+
+        .field-wrap {
+            position: relative;
+        }
+
+        .field-icon {
+            position: absolute;
+            left: 13px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            font-size: 15px;
+            pointer-events: none;
+        }
+
+        .field-input {
+            width: 100%;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 11px 14px 11px 38px;
+            font-size: 14px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            color: #0f172a;
+            background: #f8fafc;
+            transition: all .2s;
+            outline: none;
+        }
+
+            .field-input:focus {
+                border-color: #6366f1;
+                box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+                background: #fff;
+            }
+
+            .field-input::placeholder {
+                color: #cbd5e1;
+            }
+
+        .password-toggle {
+            position: absolute;
+            right: 13px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 15px;
+            padding: 0;
+            transition: color .2s;
+        }
+
+            .password-toggle:hover {
+                color: #6366f1;
+            }
+
+        .field-error {
+            font-size: 12px;
+            color: #ef4444;
+            font-weight: 500;
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .validation-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 10px;
+            padding: 12px 14px;
+            color: #b91c1c;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-login {
+            width: 100%;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 13px;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            cursor: pointer;
+            transition: background .2s, transform .15s, box-shadow .2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+            .btn-login:hover {
+                background: #4f46e5;
+                transform: translateY(-1px);
+                box-shadow: 0 8px 24px rgba(99,102,241,0.3);
+            }
+
+            .btn-login:active {
+                transform: translateY(0);
+            }
+
+        .form-note {
+            margin-top: 24px;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12.5px;
+            color: #64748b;
+        }
+
+            .form-note i {
+                color: #6366f1;
+                font-size: 14px;
+                flex-shrink: 0;
+            }
+
+        .divider {
+            height: 1px;
+            background: #f1f5f9;
+            margin: 28px 0;
+        }
+
+        .footer-text {
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        /* Responsive */
+        @@media (max-width: 860px) {
+            .left-panel {
+                display: none;
+            }
+
+            .right-panel {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Left decorative panel -->
+    <div class="left-panel">
+        <div class="grid-pattern"></div>
+
+        <div class="left-content">
+            <div class="brand-mark">
+                <div class="brand-icon">✓</div>
+                <div class="brand-name">Task<span>Flow</span></div>
+            </div>
+
+            <h1 class="hero-heading">
+                Quản lý công việc<br>
+                <em>thông minh hơn</em>
+            </h1>
+
+            <p class="hero-sub">
+                Theo dõi tiến độ, phân công nhiệm vụ và hoàn thành mục tiêu cùng nhóm — mọi lúc, mọi nơi.
+            </p>
+
+            <div class="feature-list">
+                <div class="feature-item">
+                    <div class="feature-dot green"><i class="bi bi-check2-circle"></i></div>
+                    <span class="feature-text">Theo dõi trạng thái công việc theo thời gian thực</span>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-dot indigo"><i class="bi bi-people"></i></div>
+                    <span class="feature-text">Phân công nhiệm vụ linh hoạt cho từng thành viên</span>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-dot amber"><i class="bi bi-bell"></i></div>
+                    <span class="feature-text">Cảnh báo công việc quá hạn tự động</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating cards decoration -->
+        <div class="floating-cards">
+            <div class="mini-card">
+                <div class="mini-card-title">Thiết kế UI Dashboard</div>
+                <div class="mini-card-row">
+                    <span class="mini-badge done">Done</span>
+                    <div class="mini-avatar">A</div>
+                </div>
+            </div>
+            <div class="mini-card">
+                <div class="mini-card-title">API tích hợp báo cáo</div>
+                <div class="mini-card-row">
+                    <span class="mini-badge doing">Doing</span>
+                    <div class="mini-avatar">B</div>
+                </div>
+            </div>
+            <div class="mini-card">
+                <div class="mini-card-title">Viết unit test module</div>
+                <div class="mini-card-row">
+                    <span class="mini-badge todo">ToDo</span>
+                    <div class="mini-avatar">C</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right login panel -->
+    <div class="right-panel">
+        <div class="login-form-wrap">
+            <div class="form-greeting">
+                <h1>Chào mừng trở lại 👋</h1>
+                <p>Đăng nhập để tiếp tục quản lý công việc</p>
+            </div>
+
+            <form asp-action="Login" method="post">
+                <div asp-validation-summary="ModelOnly" class="validation-box">
+                    <i class="bi bi-exclamation-circle-fill"></i>
+                    <span></span>
+                </div>
+
+                <div class="field-group">
+                    <label asp-for="Email" class="field-label"></label>
+                    <div class="field-wrap">
+                        <i class="bi bi-envelope field-icon"></i>
+                        <input asp-for="Email" class="field-input" placeholder="email@example.com" autocomplete="email" />
+                    </div>
+                    <span asp-validation-for="Email" class="field-error">
+                        <i class="bi bi-exclamation-circle"></i>
+                    </span>
+                </div>
+
+                <div class="field-group">
+                    <label asp-for="Password" class="field-label"></label>
+                    <div class="field-wrap">
+                        <i class="bi bi-lock field-icon"></i>
+                        <input asp-for="Password" id="passwordInput" class="field-input" placeholder="••••••••" autocomplete="current-password" />
+                        <button type="button" class="password-toggle" onclick="togglePassword()" id="toggleBtn">
+                            <i class="bi bi-eye" id="toggleIcon"></i>
+                        </button>
+                    </div>
+                    <span asp-validation-for="Password" class="field-error">
+                        <i class="bi bi-exclamation-circle"></i>
+                    </span>
+                </div>
+
+                <button type="submit" class="btn-login">
+                    <i class="bi bi-box-arrow-in-right"></i> Đăng nhập
+                </button>
+
+                <div class="form-note">
+                    <i class="bi bi-shield-check"></i>
+                    Tài khoản được phân quyền theo vai trò <strong>Admin</strong> / <strong>User</strong>
+                </div>
+            </form>
+
+            <div class="divider"></div>
+            <div class="footer-text">&copy; 2026 TaskFlow — Task Management System</div>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function togglePassword() {
+            const input = document.getElementById('passwordInput');
+            const icon  = document.getElementById('toggleIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'bi bi-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'bi bi-eye';
+            }
+        }
+    </script>
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+</body>
+</html>

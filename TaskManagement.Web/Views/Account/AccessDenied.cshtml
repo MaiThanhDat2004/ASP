@@ -1,0 +1,19 @@
+﻿@{
+    ViewData["Title"] = "Không có quyền truy cập";
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8 col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center p-5">
+                <h2 class="text-danger fw-bold mb-3">Truy cập bị từ chối</h2>
+                <p class="text-muted mb-4">
+                    Bạn không có quyền thực hiện chức năng này.
+                </p>
+                <a asp-controller="Tasks" asp-action="Index" class="btn btn-primary">
+                    Quay lại trang công việc
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

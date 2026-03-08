@@ -1,0 +1,455 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - TaskFlow</title>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/TaskManagement.Web.styles.css" asp-append-version="true" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        :root {
+            --sidebar-width: 260px;
+            --sidebar-bg: #0f172a;
+            --sidebar-border: #1e293b;
+            --accent: #6366f1;
+            --accent-light: #818cf8;
+            --accent-glow: rgba(99,102,241,0.15);
+            --surface: #ffffff;
+            --surface-2: #f8fafc;
+            --text-primary: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #06b6d4;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--surface-2);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            margin: 0;
+        }
+
+        /* ── SIDEBAR ── */
+        .app-sidebar {
+            width: var(--sidebar-width);
+            min-height: 100vh;
+            background: var(--sidebar-bg);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+            border-right: 1px solid var(--sidebar-border);
+            transition: transform .3s ease;
+        }
+
+        .sidebar-brand {
+            padding: 24px 20px 20px;
+            border-bottom: 1px solid var(--sidebar-border);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--accent);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .brand-text {
+            font-size: 17px;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.3px;
+        }
+
+            .brand-text span {
+                color: var(--accent-light);
+            }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 12px;
+            overflow-y: auto;
+        }
+
+        .nav-section-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: #475569;
+            padding: 8px 10px 4px;
+            margin-top: 8px;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            border-radius: 8px;
+            color: #94a3b8;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all .2s;
+            margin-bottom: 2px;
+        }
+
+            .sidebar-link:hover {
+                background: rgba(255,255,255,0.06);
+                color: #fff;
+            }
+
+            .sidebar-link.active {
+                background: var(--accent-glow);
+                color: var(--accent-light);
+                border: 1px solid rgba(99,102,241,0.2);
+            }
+
+            .sidebar-link i {
+                font-size: 16px;
+                width: 20px;
+                text-align: center;
+            }
+
+        .sidebar-footer {
+            padding: 16px 12px;
+            border-top: 1px solid var(--sidebar-border);
+        }
+
+        .user-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--sidebar-border);
+        }
+
+        .user-avatar {
+            width: 34px;
+            height: 34px;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .user-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #e2e8f0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-role {
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        .btn-logout {
+            background: none;
+            border: none;
+            color: #ef4444;
+            padding: 4px 6px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background .2s;
+            font-size: 16px;
+        }
+
+            .btn-logout:hover {
+                background: rgba(239,68,68,0.1);
+            }
+
+        /* ── MAIN CONTENT ── */
+        .app-main {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .app-topbar {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0 28px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .page-title-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .topbar-badge {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: var(--accent-glow);
+            color: var(--accent);
+            border: 1px solid rgba(99,102,241,0.2);
+        }
+
+        .btn-sidebar-toggle {
+            display: none;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px 10px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .app-content {
+            padding: 28px;
+            flex: 1;
+        }
+
+        .app-footer {
+            padding: 16px 28px;
+            border-top: 1px solid var(--border);
+            background: var(--surface);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+            .app-footer a {
+                color: var(--accent);
+                text-decoration: none;
+            }
+
+                .app-footer a:hover {
+                    text-decoration: underline;
+                }
+
+        /* ── MOBILE ── */
+        @@media (max-width: 991px) {
+            .app-sidebar {
+                transform: translateX(-100%);
+            }
+
+                .app-sidebar.open {
+                    transform: translateX(0);
+                }
+
+            .app-main {
+                margin-left: 0;
+            }
+
+            .btn-sidebar-toggle {
+                display: block;
+            }
+
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 999;
+            }
+
+                .sidebar-overlay.open {
+                    display: block;
+                }
+        }
+
+        /* ── LOGIN PAGE ── */
+        body.auth-page {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+            body.auth-page .app-sidebar,
+            body.auth-page .app-topbar,
+            body.auth-page .app-footer {
+                display: none;
+            }
+
+            body.auth-page .app-main {
+                margin-left: 0;
+            }
+
+            body.auth-page .app-content {
+                padding: 0;
+            }
+    </style>
+</head>
+<body class="@(ViewBag.AuthPage == true ? "auth-page" : "")">
+
+    @if (ViewBag.AuthPage != true)
+    {
+        <!-- Sidebar overlay for mobile -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+        <!-- Sidebar -->
+        <aside class="app-sidebar" id="appSidebar">
+            <a class="sidebar-brand" asp-area="" asp-controller="Tasks" asp-action="Index">
+                <div class="brand-icon">✓</div>
+                <div class="brand-text">Task<span>Flow</span></div>
+            </a>
+
+            <nav class="sidebar-nav">
+                @if (User.Identity != null && User.Identity.IsAuthenticated)
+                {
+                    <div class="nav-section-label">Tổng quan</div>
+                    <a class="sidebar-link" asp-controller="Tasks" asp-action="Index">
+                        <i class="bi bi-grid-1x2"></i> Tất cả công việc
+                    </a>
+                    <a class="sidebar-link" asp-controller="Tasks" asp-action="MyTasks">
+                        <i class="bi bi-person-check"></i> Công việc của tôi
+                    </a>
+
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <div class="nav-section-label">Quản lý</div>
+                        <a class="sidebar-link" asp-controller="Tasks" asp-action="Create">
+                            <i class="bi bi-plus-circle"></i> Tạo công việc
+                        </a>
+                    }
+                }
+            </nav>
+
+            <div class="sidebar-footer">
+                @if (User.Identity != null && User.Identity.IsAuthenticated)
+                {
+                    <div class="user-card">
+                        <div class="user-avatar">
+                            @(User.Identity.Name?.Substring(0, 1).ToUpper() ?? "U")
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">@User.Identity.Name</div>
+                            <div class="user-role">@User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value</div>
+                        </div>
+                        <a asp-controller="Account" asp-action="Logout" class="btn-logout" title="Đăng xuất">
+                            <i class="bi bi-box-arrow-right"></i>
+                        </a>
+                    </div>
+                }
+                else
+                {
+                    <a asp-controller="Account" asp-action="Login" class="sidebar-link" style="justify-content:center; background: var(--accent); color: white; border-radius: 8px;">
+                        <i class="bi bi-box-arrow-in-right"></i> Đăng nhập
+                    </a>
+                }
+            </div>
+        </aside>
+
+        <!-- Main area -->
+        <div class="app-main">
+            <header class="app-topbar">
+                <div class="page-title-area">
+                    <button class="btn-sidebar-toggle" onclick="toggleSidebar()">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <span style="font-size:14px; color: var(--text-muted);">@ViewData["Title"]</span>
+                </div>
+                <div class="topbar-right">
+                    @if (User.Identity != null && User.Identity.IsAuthenticated)
+                    {
+                        <span class="topbar-badge">
+                            <i class="bi bi-circle-fill" style="font-size:7px; vertical-align:2px;"></i>
+                            Online
+                        </span>
+                    }
+                </div>
+            </header>
+
+            <main class="app-content" role="main">
+                @RenderBody()
+            </main>
+
+            <footer class="app-footer">
+                <span>&copy; 2026 TaskFlow — Task Management System</span>
+                <a asp-area="" asp-controller="Home" asp-action="Privacy">Chính sách riêng tư</a>
+            </footer>
+        </div>
+    }
+    else
+    {
+        <div class="app-main" style="margin-left:0;">
+            <main class="app-content" role="main">
+                @RenderBody()
+            </main>
+        </div>
+    }
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        function toggleSidebar() {
+            document.getElementById('appSidebar').classList.toggle('open');
+            document.getElementById('sidebarOverlay').classList.toggle('open');
+        }
+
+        // Auto-highlight active link
+        const links = document.querySelectorAll('.sidebar-link');
+        links.forEach(link => {
+            if (link.href === window.location.href) {
+                link.classList.add('active');
+            }
+        });
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

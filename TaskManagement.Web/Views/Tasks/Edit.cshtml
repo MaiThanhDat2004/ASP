@@ -1,0 +1,279 @@
+﻿@model TaskManagement.Web.Models.TaskItem
+
+@{
+    ViewData["Title"] = "Cập nhật công việc";
+}
+
+<style>
+    .form-page-wrapper {
+        max-width: 780px;
+        margin: 0 auto;
+    }
+
+    .form-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    .form-card-header {
+        padding: 24px 28px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .form-icon {
+        width: 44px;
+        height: 44px;
+        background: rgba(245,158,11,0.1);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: #f59e0b;
+        flex-shrink: 0;
+    }
+
+    .form-card-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    .form-card-subtitle {
+        font-size: 13px;
+        color: #94a3b8;
+        margin: 3px 0 0;
+    }
+
+    .form-card-body {
+        padding: 26px 28px;
+    }
+
+    .field-label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        margin-bottom: 7px;
+        display: block;
+    }
+
+    .field-input {
+        width: 100%;
+        border: 1px solid #e2e8f0;
+        border-radius: 9px;
+        padding: 10px 14px;
+        font-size: 14px;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        color: #0f172a;
+        background: #f8fafc;
+        transition: all .2s;
+        outline: none;
+    }
+
+        .field-input:focus {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 3px rgba(245,158,11,0.1);
+            background: #fff;
+        }
+
+        .field-input.lg {
+            padding: 12px 14px;
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+    textarea.field-input {
+        resize: vertical;
+        min-height: 110px;
+    }
+
+    .field-error {
+        font-size: 12px;
+        color: #ef4444;
+        margin-top: 5px;
+        font-weight: 500;
+    }
+
+    .validation-error-box {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 10px;
+        padding: 12px 16px;
+        color: #b91c1c;
+        font-size: 13.5px;
+        margin-bottom: 22px;
+    }
+
+    .form-divider {
+        height: 1px;
+        background: #f1f5f9;
+        margin: 24px 0;
+    }
+
+    .form-section-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #94a3b8;
+        margin-bottom: 16px;
+    }
+
+    .btn-update {
+        background: #f59e0b;
+        color: white;
+        border: none;
+        border-radius: 9px;
+        padding: 11px 24px;
+        font-size: 14px;
+        font-weight: 700;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        cursor: pointer;
+        transition: background .2s, transform .15s;
+    }
+
+        .btn-update:hover {
+            background: #d97706;
+            transform: translateY(-1px);
+        }
+
+    .btn-back {
+        background: transparent;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        border-radius: 9px;
+        padding: 11px 22px;
+        font-size: 14px;
+        font-weight: 600;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        text-decoration: none;
+        transition: all .2s;
+    }
+
+        .btn-back:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+            color: #0f172a;
+        }
+
+    .task-id-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #f1f5f9;
+        border-radius: 20px;
+        padding: 4px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #64748b;
+    }
+</style>
+
+<div class="form-page-wrapper">
+    <div class="form-card">
+        <div class="form-card-header">
+            <div class="form-icon"><i class="bi bi-pencil-square"></i></div>
+            <div style="flex:1;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <div class="form-card-title">Cập nhật công việc</div>
+                    <span class="task-id-chip"><i class="bi bi-hash"></i>@Model.TaskId</span>
+                </div>
+                <div class="form-card-subtitle">Chỉnh sửa thông tin công việc hiện có trong hệ thống</div>
+            </div>
+        </div>
+
+        <div class="form-card-body">
+            <form asp-action="Edit" method="post">
+                <div asp-validation-summary="ModelOnly" class="validation-error-box"></div>
+
+                <input type="hidden" asp-for="TaskId" />
+                <input type="hidden" asp-for="CreatedAt" />
+                <input type="hidden" asp-for="CreatedBy" />
+
+                <div class="form-section-label">Thông tin cơ bản</div>
+
+                <div class="mb-4">
+                    <label asp-for="Title" class="field-label"></label>
+                    <input asp-for="Title" class="field-input lg" placeholder="Nhập tiêu đề công việc" />
+                    <span asp-validation-for="Title" class="field-error"></span>
+                </div>
+
+                <div class="mb-4">
+                    <label asp-for="Description" class="field-label"></label>
+                    <textarea asp-for="Description" class="field-input" placeholder="Nhập mô tả công việc"></textarea>
+                    <span asp-validation-for="Description" class="field-error"></span>
+                </div>
+
+                <div class="form-divider"></div>
+                <div class="form-section-label">Phân loại & Phân công</div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <label asp-for="Status" class="field-label"></label>
+                        <select asp-for="Status" class="field-input">
+                            <option value="ToDo">ToDo</option>
+                            <option value="Doing">Doing</option>
+                            <option value="Done">Done</option>
+                        </select>
+                        <span asp-validation-for="Status" class="field-error"></span>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label asp-for="Priority" class="field-label"></label>
+                        <select asp-for="Priority" class="field-input">
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                        </select>
+                        <span asp-validation-for="Priority" class="field-error"></span>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label asp-for="Deadline" class="field-label"></label>
+                        <input asp-for="Deadline" type="datetime-local" class="field-input" />
+                        <span asp-validation-for="Deadline" class="field-error"></span>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label asp-for="AssignedTo" class="field-label"></label>
+                        <select asp-for="AssignedTo" asp-items="ViewBag.Users" class="field-input">
+                            <option value="">-- Chọn người được giao --</option>
+                        </select>
+                        <span asp-validation-for="AssignedTo" class="field-error"></span>
+                    </div>
+                </div>
+
+                <div class="form-divider"></div>
+
+                <div class="d-flex gap-3">
+                    <button type="submit" class="btn-update">
+                        <i class="bi bi-check2-circle"></i> Cập nhật
+                    </button>
+                    <a asp-action="Index" class="btn-back">
+                        <i class="bi bi-arrow-left"></i> Quay lại
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
