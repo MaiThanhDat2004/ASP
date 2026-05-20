@@ -1,0 +1,976 @@
+﻿@model TaskManagement.Web.Models.TaskItem
+@using TaskManagement.Web.Models
+
+@{
+    ViewData["Title"] = "Chi tiết công việc";
+
+    var statusCls = Model.Status switch
+    {
+        "Todo"    => "status-todo",
+        "Doing"   => "status-doing",
+        "Done"    => "status-done",
+        "Overdue" => "status-overdue",
+        _         => "status-todo"
+    };
+    var priorityColor = Model.Priority switch
+    {
+        "Low"    => "#06b6d4",
+        "Medium" => "#3b82f6",
+        "High"   => "#ef4444",
+        _        => "#94a3b8"
+    };
+    var isOverdue = Model.Deadline < DateTime.Now && Model.Status != "Done" && Model.Status != "Overdue";
+
+    var submissions       = ViewBag.Submissions    as List<TaskSubmission>    ?? new();
+    var submitterNames    = ViewBag.SubmitterNames as Dictionary<int, string> ?? new();
+    var assignees         = ViewBag.Assignees      as List<TaskAssignee>      ?? new();
+    var allUsers          = ViewBag.AllUsers       as List<User>              ?? new();
+
+    bool isAssignedUser   = (bool)(ViewBag.IsAssignedUser ?? false);
+    bool isLeader         = (bool)(ViewBag.IsLeader       ?? false);
+    bool canEdit          = (bool)(ViewBag.CanEdit        ?? false);
+    bool canDelete        = (bool)(ViewBag.CanDelete      ?? false);
+    bool isGroupMember    = (bool)(ViewBag.IsGroupMember  ?? false);
+    int  currentUserId    = (int) (ViewBag.CurrentUserId  ?? 0);
+
+    var outputReqs        = ViewBag.OutputRequirements   as List<TaskOutputRequirement> ?? new();
+    var reviewerNames     = ViewBag.ReviewerNames        as Dictionary<int, string>    ?? new();
+    var taskComments      = ViewBag.TaskComments         as List<TaskComment>           ?? new();
+    var outputChats       = ViewBag.OutputChats          as Dictionary<int, List<TaskComment>> ?? new();
+    var canViewOutputChat = ViewBag.CanViewOutputChat    as Dictionary<int, bool>      ?? new();
+
+    int approvedCount = outputReqs.Count(r => r.Submissions.Any(s => s.Status == "Approved"));
+    int totalRequired = outputReqs.Count(r => r.IsRequired);
+    bool hasOutputs   = outputReqs.Any();
+
+    string UserName(int uid) => allUsers.FirstOrDefault(u => u.UserId == uid)?.FullName ?? "?";
+    List<int> SupportIds(string? ids) => string.IsNullOrWhiteSpace(ids)
+        ? new()
+        : ids.Split(',', StringSplitOptions.RemoveEmptyEntries)
+             .Select(s => int.TryParse(s.Trim(), out var id) ? id : 0)
+             .Where(id => id > 0).ToList();
+
+    bool CanViewOutputDetail(TaskOutputRequirement req)
+    {
+        var sIds = SupportIds(req.SupportAssigneeIds);
+        return isLeader
+            || User.IsInRole("Admin") || User.IsInRole("SystemAdmin")
+            || req.PrimaryAssigneeId == currentUserId
+            || sIds.Contains(currentUserId);
+    }
+}
+
+<style>
+    /* ── LAYOUT ── */
+    .detail-wrapper { max-width: 1200px; margin: 0 auto; }
+
+    /* Header */
+    .task-header-card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:20px 26px; margin-bottom:18px; }
+    .task-header-top  { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    .task-title       { font-size:22px; font-weight:800; color:#0f172a; margin:8px 0 5px; }
+    .task-meta        { font-size:13px; color:#94a3b8; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .meta-dot         { width:4px; height:4px; background:#cbd5e1; border-radius:50%; }
+
+    /* 2-column */
+    .detail-cols { display:grid; grid-template-columns:1fr 360px; gap:18px; align-items:start; }
+    @@media (max-width:991px) { .detail-cols { grid-template-columns:1fr; } }
+
+    /* Cards */
+    .detail-card  { background:#fff; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden; margin-bottom:16px; }
+    .card-header  { padding:14px 20px; border-bottom:1px solid #f1f5f9; display:flex; align-items:center; justify-content:space-between; }
+    .card-title   { font-size:15px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px; }
+    .card-sub     { font-size:12px; color:#94a3b8; margin-top:2px; }
+    .card-body    { padding:18px 20px; }
+
+    /* Tabs */
+    .tab-nav { display:flex; gap:4px; padding:14px 20px 0; border-bottom:1px solid #f1f5f9; background:#fff; }
+    .tab-btn { padding:8px 18px; font-size:13.5px; font-weight:700; border:none; background:none; cursor:pointer; color:#64748b; border-bottom:3px solid transparent; margin-bottom:-1px; font-family:'Plus Jakarta Sans',sans-serif; transition:all .2s; display:flex; align-items:center; gap:6px; }
+    .tab-btn:hover { color:#6366f1; }
+    .tab-btn.active { color:#6366f1; border-bottom-color:#6366f1; }
+    .tab-badge { background:#eff6ff; color:#2563eb; border-radius:20px; padding:1px 7px; font-size:11px; font-weight:700; }
+    .tab-badge.warn { background:#fef2f2; color:#dc2626; }
+    .tab-content { display:none; padding:18px 20px; }
+    .tab-content.active { display:block; }
+
+    /* Info */
+    .info-grid  { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+    @@media (max-width:576px) { .info-grid { grid-template-columns:1fr; } }
+    .info-block { background:#f8fafc; border:1px solid #f1f5f9; border-radius:10px; padding:12px 14px; }
+    .info-key   { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:#94a3b8; margin-bottom:6px; }
+    .info-value { font-size:14px; font-weight:600; color:#0f172a; }
+
+    /* Status */
+    .status-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 11px; border-radius:20px; font-size:12px; font-weight:700; }
+    .status-pill::before { content:''; width:6px; height:6px; border-radius:50%; }
+    .status-todo::before    { background:#94a3b8; } .status-todo    { background:#f1f5f9; color:#475569; }
+    .status-doing::before   { background:#f59e0b; } .status-doing   { background:#fffbeb; color:#92400e; }
+    .status-done::before    { background:#10b981; } .status-done    { background:#ecfdf5; color:#065f46; }
+    .status-overdue::before { background:#ef4444; } .status-overdue { background:#fef2f2; color:#991b1b; }
+
+    .overdue-chip  { display:inline-flex; align-items:center; gap:6px; background:#fef2f2; border:1px solid #fecaca; color:#dc2626; border-radius:20px; padding:5px 12px; font-size:12px; font-weight:700; }
+    .assignee-chip { display:inline-flex; align-items:center; gap:5px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:20px; padding:3px 9px; font-size:12px; font-weight:600; color:#1e40af; margin:2px; }
+    .extend-count-badge { background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; border-radius:20px; padding:2px 7px; font-size:11px; font-weight:700; }
+
+    /* Buttons */
+    .btn-start  { background:linear-gradient(135deg,#6366f1,#8b5cf6); color:white; border:none; border-radius:9px; padding:9px 18px; font-size:13px; font-weight:700; font-family:'Plus Jakarta Sans',sans-serif; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+    .btn-edit   { background:#fffbeb; color:#b45309; border:1px solid #fde68a; border-radius:9px; padding:9px 16px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:none; }
+    .btn-delete { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:9px; padding:9px 16px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:none; }
+    .btn-back   { background:transparent; color:#475569; border:1px solid #e2e8f0; border-radius:9px; padding:9px 16px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:none; }
+    .btn-back:hover { background:#f8fafc; }
+    .btn-overdue { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif; display:inline-flex; align-items:center; gap:5px; }
+    .btn-extend  { background:#fffbeb; color:#b45309; border:1px solid #fde68a; border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif; display:inline-flex; align-items:center; gap:5px; }
+    .btn-approve { background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; border-radius:7px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif; display:inline-flex; align-items:center; gap:4px; }
+    .btn-reject  { background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; border-radius:7px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif; display:inline-flex; align-items:center; gap:4px; }
+    .btn-download{ background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:7px; padding:5px 10px; font-size:12px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px; }
+    .btn-submit-upload { background:#6366f1; color:white; border:none; border-radius:9px; padding:10px 20px; font-size:13px; font-weight:700; font-family:'Plus Jakarta Sans',sans-serif; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+
+    /* Fields */
+    .field-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#475569; margin-bottom:5px; display:block; }
+    .field-input { width:100%; border:1px solid #e2e8f0; border-radius:8px; padding:8px 11px; font-size:13px; font-family:'Plus Jakarta Sans',sans-serif; color:#0f172a; background:#f8fafc; outline:none; transition:all .2s; }
+    .field-input:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,0.1); background:#fff; }
+
+    /* Upload */
+    .upload-zone { border:2px dashed #e2e8f0; border-radius:10px; padding:20px; text-align:center; background:#f8fafc; cursor:pointer; position:relative; transition:all .2s; }
+    .upload-zone:hover { border-color:#6366f1; }
+    .file-input-hidden { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+    .selected-file { display:none; align-items:center; gap:8px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:8px 12px; margin-top:8px; font-size:13px; color:#1e40af; }
+    .selected-file.show { display:flex; }
+
+    /* Output cards */
+    .output-card { border:1px solid #e2e8f0; border-radius:12px; margin-bottom:12px; overflow:hidden; background:#fff; }
+    .output-card.approved   { border-color:#bbf7d0; background:#f0fdf4; }
+    .output-card.is-overdue { border-color:#fecaca; background:#fef9f9; }
+    .output-card-header { padding:12px 16px; border-bottom:1px solid #f1f5f9; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+    .output-card-body   { padding:12px 16px; }
+    .output-name { font-size:14px; font-weight:700; color:#0f172a; }
+    .output-meta-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+    .output-meta-chip { display:inline-flex; align-items:center; gap:4px; border-radius:20px; padding:2px 8px; font-size:11px; font-weight:600; }
+    .chip-format   { background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; }
+    .chip-deadline { background:#fffbeb; border:1px solid #fde68a; color:#92400e; }
+    .chip-deadline.overdue { background:#fef2f2; border-color:#fecaca; color:#dc2626; }
+    .chip-primary  { background:#f0fdf4; border:1px solid #bbf7d0; color:#065f46; }
+    .chip-support  { background:#faf5ff; border:1px solid #e9d5ff; color:#6d28d9; }
+    .chip-extend   { background:#fff7ed; border:1px solid #fed7aa; color:#c2410c; }
+
+    /* Lock overlay for restricted output */
+    .output-locked { background:#f8fafc; border-radius:8px; padding:14px; text-align:center; color:#94a3b8; font-size:13px; margin-top:8px; }
+
+    /* Badges */
+    .badge-approved       { background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; border-radius:20px; padding:2px 8px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px; }
+    .badge-pending        { background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:20px; padding:2px 8px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px; }
+    .badge-needs-revision { background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; border-radius:20px; padding:2px 8px; font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:4px; }
+    .round-badge { background:#f1f5f9; color:#475569; border-radius:20px; padding:2px 7px; font-size:11px; font-weight:700; }
+
+    /* Submission */
+    .submission-item { border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+    .submission-file { font-size:13.5px; font-weight:600; color:#0f172a; display:inline-flex; align-items:center; gap:6px; }
+    .submission-meta { font-size:12px; color:#94a3b8; margin-top:3px; }
+    .comment-box        { background:#f1f5f9; border-radius:7px; padding:8px 10px; margin-top:6px; font-size:12.5px; color:#475569; }
+    .needs-revision-box { background:#fff7ed; border:1px solid #fed7aa; border-radius:7px; padding:8px 10px; margin-top:6px; font-size:12.5px; color:#c2410c; }
+
+    /* Overdue/Extend boxes */
+    .overdue-box { background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:12px 14px; }
+    .overdue-box-title { font-size:12px; font-weight:700; color:#991b1b; margin-bottom:8px; display:flex; align-items:center; gap:5px; }
+    .extend-box { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:12px 14px; }
+    .extend-box-title { font-size:12px; font-weight:700; color:#92400e; margin-bottom:8px; display:flex; align-items:center; gap:5px; }
+
+    /* Chat */
+    .chat-sticky { position:sticky; top:80px; }
+    .chat-wrap { background:#f8fafc; border-radius:10px; padding:12px; }
+    .chat-messages { height:340px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:10px; padding-right:2px; }
+    .chat-bubble-wrap { display:flex; gap:7px; align-items:flex-end; }
+    .chat-bubble-wrap.mine { flex-direction:row-reverse; }
+    .chat-av { width:26px; height:26px; border-radius:6px; background:linear-gradient(135deg,#6366f1,#8b5cf6); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:white; flex-shrink:0; }
+    .chat-av.other { background:linear-gradient(135deg,#10b981,#059669); }
+    .chat-bubble { max-width:80%; padding:8px 11px; border-radius:10px; font-size:13px; line-height:1.45; word-break:break-word; }
+    .chat-bubble.mine  { background:#6366f1; color:white; border-bottom-right-radius:3px; }
+    .chat-bubble.other { background:#fff; border:1px solid #e2e8f0; color:#0f172a; border-bottom-left-radius:3px; }
+    .chat-sender { font-size:10px; font-weight:700; color:#64748b; margin-bottom:2px; }
+    .chat-time   { font-size:10px; margin-top:2px; opacity:.65; }
+    .chat-input-row { display:flex; gap:6px; }
+    .chat-input { flex:1; border:1px solid #e2e8f0; border-radius:8px; padding:8px 11px; font-size:13px; font-family:'Plus Jakarta Sans',sans-serif; outline:none; background:#fff; }
+    .chat-input:focus { border-color:#6366f1; }
+    .btn-send { background:#6366f1; color:white; border:none; border-radius:8px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; flex-shrink:0; }
+    .btn-send:hover { background:#4f46e5; }
+    .chat-empty { text-align:center; color:#94a3b8; font-size:12.5px; padding:20px 0; }
+
+    /* Output chat */
+    .output-chat-toggle { background:none; border:none; color:#6366f1; font-size:12px; font-weight:700; cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif; display:flex; align-items:center; gap:4px; padding:0; margin-top:10px; }
+    .private-badge { background:#f5f3ff; color:#6d28d9; border-radius:20px; padding:2px 7px; font-size:10px; font-weight:700; }
+
+    /* Section divider */
+    .section-divider { height:1px; background:#f1f5f9; margin:14px 0; }
+
+    /* Alerts */
+    .alert-success-custom { background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; border-radius:10px; padding:12px 16px; font-size:13.5px; font-weight:500; display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+    .alert-error-custom   { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; border-radius:10px; padding:12px 16px; font-size:13.5px; font-weight:500; display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+
+    .description-box { white-space:pre-wrap; line-height:1.65; color:#334155; font-size:13.5px; }
+    .user-av-sm { width:26px; height:26px; background:linear-gradient(135deg,#10b981,#059669); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:white; flex-shrink:0; }
+</style>
+
+<div class="detail-wrapper">
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert-success-custom"><i class="bi bi-check-circle-fill"></i> @TempData["SuccessMessage"]</div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert-error-custom"><i class="bi bi-exclamation-circle-fill"></i> @TempData["ErrorMessage"]</div>
+    }
+
+    @* ── HEADER ── *@
+    <div class="task-header-card">
+        <div class="task-header-top">
+            <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <span style="font-size:12px;color:#94a3b8;font-weight:600;">#@Model.TaskId</span>
+                    <span class="status-pill @statusCls">@Model.Status</span>
+                    <span class="status-pill" style="background:@(priorityColor+"18");color:@priorityColor;">@Model.Priority</span>
+                    @if (Model.ExtendCount > 0)
+                    {
+                        <span class="extend-count-badge">Gia hạn @Model.ExtendCount lần</span>
+                    }
+                </div>
+                <h1 class="task-title">@Model.Title</h1>
+                <div class="task-meta">
+                    <span><i class="bi bi-calendar3 me-1"></i>@Model.CreatedAt.ToString("dd/MM/yyyy")</span>
+                    <span class="meta-dot"></span>
+                    <span><i class="bi bi-person me-1"></i>@(ViewBag.CreatedUser ?? "?")</span>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;">
+                @if (isOverdue || Model.Status == "Overdue")
+                {
+                    <div class="overdue-chip">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        @(Model.Status == "Overdue" ? "Không đạt tiến độ" : "Quá hạn")
+                    </div>
+                }
+                <a asp-action="Index" class="btn-back"><i class="bi bi-arrow-left"></i> Quay lại</a>
+            </div>
+        </div>
+    </div>
+
+    @* ── 2 COLUMNS ── *@
+    <div class="detail-cols">
+
+        @* ══ CỘT TRÁI ══ *@
+        <div>
+            <div class="detail-card">
+
+                @* ── TABS ── *@
+                <div class="tab-nav">
+                    <button class="tab-btn active" onclick="switchTab('tab-info', this)">
+                        <i class="bi bi-clipboard-check"></i> Thông tin chính
+                    </button>
+                    @if (hasOutputs || isLeader)
+                    {
+                        <button class="tab-btn" onclick="switchTab('tab-output', this)">
+                            <i class="bi bi-box-seam"></i> Sản phẩm đầu ra
+                            @if (totalRequired > 0)
+                            {
+                                <span class="tab-badge @(approvedCount < totalRequired ? "warn" : "")">
+                                    @approvedCount/@totalRequired
+                                </span>
+                            }
+                        </button>
+                    }
+                </div>
+
+                @* ══ TAB 1: THÔNG TIN CHÍNH ══ *@
+                <div id="tab-info" class="tab-content active">
+
+                    @* Mô tả *@
+                    <div class="mb-3">
+                        <div class="info-key">Mô tả công việc</div>
+                        <div class="info-block">
+                            <div class="description-box">
+                                @(string.IsNullOrWhiteSpace(Model.Description) ? "Không có mô tả" : Model.Description)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-grid mb-3">
+                        <div class="info-block">
+                            <div class="info-key">Hạn hoàn thành</div>
+                            <div class="info-value @(isOverdue ? "text-danger" : "")">
+                                <i class="bi bi-calendar-event me-1" style="font-size:12px;"></i>
+                                @Model.Deadline.ToString("dd/MM/yyyy HH:mm")
+                            </div>
+                            @if (Model.OriginalDeadline.HasValue)
+                            {
+                                <div style="font-size:11px;color:#94a3b8;margin-top:3px;">
+                                    Gốc: @Model.OriginalDeadline.Value.ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                            }
+                        </div>
+                        <div class="info-block">
+                            <div class="info-key">Người thực hiện</div>
+                            <div class="info-value">
+                                @if (assignees.Any())
+                                {
+                                    @foreach (var a in assignees)
+                                    {
+                                        <span class="assignee-chip"><i class="bi bi-person"></i> @(a.User?.FullName ?? "?")</span>
+                                    }
+                                }
+                                else if (ViewBag.AssignedUser != null)
+                                {
+                                    <span class="assignee-chip"><i class="bi bi-person"></i> @ViewBag.AssignedUser</span>
+                                }
+                                else { <span style="color:#94a3b8;font-size:13px;">Chưa giao</span> }
+                            </div>
+                        </div>
+                        <div class="info-block">
+                            <div class="info-key">Ngày tạo</div>
+                            <div class="info-value">@Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</div>
+                        </div>
+                        <div class="info-block">
+                            <div class="info-key">Người giao</div>
+                            <div class="info-value" style="display:flex;align-items:center;gap:7px;">
+                                <div class="user-av-sm">@(((string)(ViewBag.CreatedUser ?? "?")).Substring(0,1).ToUpper())</div>
+                                @(ViewBag.CreatedUser ?? "?")
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Overdue reason *@
+                    @if (Model.Status == "Overdue" && !string.IsNullOrWhiteSpace(Model.OverdueReason))
+                    {
+                        <div class="overdue-box mb-3">
+                            <div class="overdue-box-title">
+                                <i class="bi bi-exclamation-triangle-fill"></i> Lý do không đạt tiến độ
+                                <span style="font-size:11px;font-weight:400;">— @Model.OverdueMarkedAt?.ToString("dd/MM HH:mm")</span>
+                            </div>
+                            <div style="font-size:13px;color:#7f1d1d;">@Model.OverdueReason</div>
+                        </div>
+                    }
+
+                    @* Action buttons *@
+                    <div class="d-flex gap-2 flex-wrap mb-3">
+                        @if (isAssignedUser && Model.Status == "Todo")
+                        {
+                            <form asp-action="StartTask" asp-controller="Tasks" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@Model.TaskId" />
+                                <button type="submit" class="btn-start"><i class="bi bi-play-fill"></i> Bắt đầu làm</button>
+                            </form>
+                        }
+                        @if (canEdit)
+                        {
+                            <a asp-action="Edit" asp-route-id="@Model.TaskId" class="btn-edit"><i class="bi bi-pencil"></i> Chỉnh sửa</a>
+                        }
+                        @if (canDelete)
+                        {
+                            <a asp-action="Delete" asp-route-id="@Model.TaskId" class="btn-delete"><i class="bi bi-trash"></i> Xóa</a>
+                        }
+                    </div>
+
+                    @* Leader: Quản lý tiến độ task chính *@
+                    @if ((isLeader || User.IsInRole("Admin") || User.IsInRole("SystemAdmin"))
+                         && Model.Status != "Done")
+                    {
+                        <div class="section-divider"></div>
+                        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
+                            Quản lý tiến độ công việc chính
+                        </div>
+                        <div class="row g-2">
+                            @if (Model.Status != "Overdue")
+                            {
+                                <div class="col-md-5">
+                                    <div class="overdue-box">
+                                        <div class="overdue-box-title"><i class="bi bi-x-circle"></i> Đánh không đạt tiến độ</div>
+                                        <form asp-action="MarkOverdue" asp-controller="Tasks" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@Model.TaskId" />
+                                            <input type="text" name="reason" class="field-input mb-2" style="font-size:12.5px;padding:7px 10px;" placeholder="Lý do (tùy chọn)..." />
+                                            <button type="submit" class="btn-overdue" onclick="return confirm('Xác nhận đánh không đạt tiến độ?')">
+                                                <i class="bi bi-x-circle"></i> Không đạt tiến độ
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            }
+                            <div class="col-md-@(Model.Status != "Overdue" ? "7" : "12")">
+                                <div class="extend-box">
+                                    <div class="extend-box-title">
+                                        <i class="bi bi-calendar-plus"></i> Gia hạn deadline
+                                        @if (Model.ExtendCount > 0) { <span class="extend-count-badge">Lần @(Model.ExtendCount+1)</span> }
+                                    </div>
+                                    <form asp-action="ExtendDeadline" asp-controller="Tasks" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@Model.TaskId" />
+                                        <input type="datetime-local" name="newDeadline" class="field-input mb-2" style="font-size:12.5px;padding:7px 10px;"
+                                               min="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")" required />
+                                        <input type="text" name="extendReason" class="field-input mb-2" style="font-size:12.5px;padding:7px 10px;" placeholder="Lý do gia hạn..." />
+                                        <button type="submit" class="btn-extend">
+                                            <i class="bi bi-calendar-check"></i>
+                                            @(Model.Status == "Overdue" ? "Gia hạn & Khôi phục" : "Gia hạn")
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @* Nộp kết quả chung (chỉ khi không có output) *@
+                    @if (isAssignedUser && !hasOutputs
+                         && (Model.Status == "Doing" || submissions.Any(s => s.Status == "NeedsRevision")))
+                    {
+                        var lastNR = submissions.LastOrDefault(s => s.Status == "NeedsRevision");
+                        <div class="section-divider"></div>
+                        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
+                            @(lastNR != null ? "Nộp lại kết quả" : "Nộp kết quả công việc")
+                        </div>
+                        <form asp-action="UploadSubmission" asp-controller="Tasks" method="post" enctype="multipart/form-data">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="taskId" value="@Model.TaskId" />
+                            <div class="mb-3">
+                                <div class="upload-zone" id="uploadZone">
+                                    <input type="file" name="file" class="file-input-hidden" id="fileInput" onchange="onFileSelected(this)" />
+                                    <div style="font-size:26px;color:#94a3b8;margin-bottom:6px;"><i class="bi bi-cloud-arrow-up"></i></div>
+                                    <div style="font-size:13px;color:#475569;font-weight:500;">Kéo thả hoặc <span style="color:#6366f1;font-weight:700;">click để chọn</span></div>
+                                    <div style="font-size:11px;color:#94a3b8;margin-top:3px;">Tối đa 20MB</div>
+                                </div>
+                                <div class="selected-file" id="selectedFileInfo">
+                                    <i class="bi bi-file-earmark-check"></i>
+                                    <span id="selectedFileName"></span>
+                                </div>
+                            </div>
+                            <textarea name="note" class="field-input mb-3" rows="2" placeholder="Ghi chú..."></textarea>
+                            <button type="submit" class="btn-submit-upload">
+                                <i class="bi bi-cloud-upload"></i> @(lastNR != null ? "Nộp lại" : "Nộp kết quả")
+                            </button>
+                        </form>
+                    }
+
+                    @* Lịch sử nộp kết quả chung *@
+                    @if (!hasOutputs || submissions.Any())
+                    {
+                        <div class="section-divider"></div>
+                        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
+                            Lịch sử nộp kết quả (@submissions.Count lần)
+                        </div>
+                        @if (submissions.Any())
+                        {
+                            @foreach (var sub in submissions.OrderByDescending(s => s.SubmittedAt))
+                            {
+                                var sName = submitterNames.ContainsKey(sub.SubmittedBy) ? submitterNames[sub.SubmittedBy] : "?";
+                                var fn  = sub.FileName ?? "";
+                                var dot = fn.LastIndexOf('.');
+                                var ext = dot >= 0 ? fn.Substring(dot).ToLower() : "";
+                                var ic  = ext == ".pdf" ? "bi bi-file-earmark-pdf text-danger"
+                                        : ext is ".doc" or ".docx" ? "bi bi-file-earmark-word text-primary"
+                                        : ext is ".xls" or ".xlsx" ? "bi bi-file-earmark-excel text-success"
+                                        : ext == ".zip" ? "bi bi-file-earmark-zip text-warning"
+                                        : "bi bi-file-earmark";
+                                <div class="submission-item">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+                                        <div>
+                                            <div class="submission-file">
+                                                <i class="@ic" style="font-size:16px;"></i> @fn
+                                                @if (sub.SubmissionRound > 0) { <span class="round-badge">Lần @sub.SubmissionRound</span> }
+                                            </div>
+                                            <div class="submission-meta">@sName — @sub.SubmittedAt.ToString("HH:mm dd/MM/yyyy")</div>
+                                        </div>
+                                        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+                                            @if (sub.Status == "Approved")          { <span class="badge-approved"><i class="bi bi-check-circle-fill"></i> Đạt</span> }
+                                            else if (sub.Status == "NeedsRevision") { <span class="badge-needs-revision"><i class="bi bi-arrow-repeat"></i> Cần sửa</span> }
+                                            else                                    { <span class="badge-pending"><i class="bi bi-hourglass-split"></i> Chờ duyệt</span> }
+                                            <a href="@sub.FilePath" download="@sub.FileName" class="btn-download"><i class="bi bi-download"></i> Tải</a>
+                                        </div>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(sub.Note))
+                                    {
+                                        <div class="comment-box"><i class="bi bi-chat-left-text me-1"></i>@sub.Note</div>
+                                    }
+                                    @if (sub.Status == "NeedsRevision" && !string.IsNullOrWhiteSpace(sub.ReviewComment))
+                                    {
+                                        <div class="needs-revision-box"><i class="bi bi-exclamation-triangle me-1"></i><strong>Sửa:</strong> @sub.ReviewComment</div>
+                                    }
+                                    @if ((isLeader || User.IsInRole("Admin")) && sub.Status == "Pending")
+                                    {
+                                        <form asp-action="ReviewSubmission" asp-controller="Tasks" method="post"
+                                              style="margin-top:8px;background:#f8fafc;border-radius:8px;padding:10px;">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="submissionId" value="@sub.SubmissionId" />
+                                            <input type="text" name="reviewComment" class="field-input mb-2" style="font-size:12.5px;padding:7px 10px;" placeholder="Nhận xét..." />
+                                            <div style="display:flex;gap:6px;">
+                                                <button type="submit" name="reviewResult" value="Approved" class="btn-approve"><i class="bi bi-check-circle"></i> Đạt</button>
+                                                <button type="submit" name="reviewResult" value="NeedsRevision" class="btn-reject"><i class="bi bi-arrow-repeat"></i> Sửa lại</button>
+                                            </div>
+                                        </form>
+                                    }
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">
+                                <div style="font-size:28px;margin-bottom:6px;">📂</div>
+                                Chưa có kết quả nào được nộp
+                            </div>
+                        }
+                    }
+                </div>@* end tab-info *@
+
+                @* ══ TAB 2: SẢN PHẨM ĐẦU RA ══ *@
+                @if (hasOutputs || isLeader)
+                {
+                    <div id="tab-output" class="tab-content">
+
+                        @* Progress bar *@
+                        @if (totalRequired > 0)
+                        {
+                            var pct = approvedCount * 100 / totalRequired;
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                                <div style="flex:1;background:#f1f5f9;border-radius:99px;height:6px;">
+                                    <div style="background:@(pct==100?"#10b981":"#6366f1");width:@pct%;height:6px;border-radius:99px;transition:width .5s;"></div>
+                                </div>
+                                <span style="font-size:13px;font-weight:700;color:@(pct==100?"#10b981":"#6366f1");flex-shrink:0;">@pct%</span>
+                            </div>
+                        }
+
+                        @foreach (var req in outputReqs)
+                        {
+                            var latestSub    = req.Submissions.OrderByDescending(s => s.SubmittedAt).FirstOrDefault();
+                            var isApproved   = latestSub?.Status == "Approved";
+                            var isPending    = latestSub?.Status == "Pending";
+                            var needsRev     = latestSub?.Status == "NeedsRevision";
+                            var supportList  = SupportIds(req.SupportAssigneeIds);
+                            var canViewChat  = canViewOutputChat.ContainsKey(req.Id) && canViewOutputChat[req.Id];
+                            var canViewDetail= CanViewOutputDetail(req);
+                            var outDeadlineOver = req.Deadline.HasValue && req.Deadline.Value < DateTime.Now && !isApproved;
+
+                            var statusColor = isApproved ? "#10b981" : needsRev ? "#f59e0b" : isPending ? "#6366f1" : "#94a3b8";
+                            var statusIcon  = isApproved ? "bi-check-circle-fill" : needsRev ? "bi-arrow-repeat" : isPending ? "bi-hourglass-split" : "bi-circle";
+                            var statusLabel = isApproved ? "Đã đạt" : needsRev ? "Cần sửa" : isPending ? "Chờ duyệt" : "Chưa nộp";
+
+                            <div class="output-card @(isApproved ? "approved" : "") @(req.IsOverdue ? "is-overdue" : "")">
+                                @* Output header — tất cả đều thấy *@
+                                <div class="output-card-header">
+                                    <div style="flex:1;">
+                                        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+                                            <i class="bi @statusIcon" style="color:@statusColor;font-size:15px;"></i>
+                                            <span class="output-name">@req.Name</span>
+                                            @if (req.IsRequired) { <span style="font-size:11px;color:#ef4444;font-weight:600;">*bắt buộc</span> }
+                                            @if (req.IsOverdue)  { <span style="background:#fef2f2;color:#dc2626;border-radius:20px;padding:2px 7px;font-size:10px;font-weight:700;">Không đạt tiến độ</span> }
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(req.Description))
+                                        {
+                                            <div style="font-size:12px;color:#64748b;margin-top:3px;">@req.Description</div>
+                                        }
+                                        @* Meta chips — tất cả đều thấy *@
+                                        <div class="output-meta-row">
+                                            @if (!string.IsNullOrWhiteSpace(req.AllowedFileFormat))
+                                            {
+                                                <span class="output-meta-chip chip-format"><i class="bi bi-file-earmark"></i> @req.AllowedFileFormat</span>
+                                            }
+                                            @if (req.Deadline.HasValue)
+                                            {
+                                                <span class="output-meta-chip chip-deadline @(outDeadlineOver ? "overdue" : "")">
+                                                    <i class="bi bi-clock"></i> @req.Deadline.Value.ToString("dd/MM HH:mm")
+                                                    @if (outDeadlineOver) { <span>⚠️</span> }
+                                                </span>
+                                            }
+                                            @if (req.PrimaryAssigneeId.HasValue)
+                                            {
+                                                <span class="output-meta-chip chip-primary">
+                                                    <i class="bi bi-person-fill"></i> @UserName(req.PrimaryAssigneeId.Value)
+                                                </span>
+                                            }
+                                            @foreach (var sid in supportList)
+                                            {
+                                                <span class="output-meta-chip chip-support">
+                                                    <i class="bi bi-person"></i> @UserName(sid)
+                                                </span>
+                                            }
+                                            @if (req.ExtendCount > 0)
+                                            {
+                                                <span class="output-meta-chip chip-extend">Gia hạn @req.ExtendCount lần</span>
+                                            }
+                                        </div>
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                                        <span style="background:@(statusColor+"18");color:@statusColor;border-radius:20px;padding:3px 9px;font-size:11px;font-weight:700;">
+                                            @statusLabel
+                                        </span>
+                                        @if (isLeader && !isApproved)
+                                        {
+                                            <form asp-action="DeleteOutputRequirement" method="post" style="display:inline;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="requirementId" value="@req.Id" />
+                                                <input type="hidden" name="taskId" value="@Model.TaskId" />
+                                                <button type="submit" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:13px;"
+                                                        onclick="return confirm('Xóa sản phẩm này?')">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                    </div>
+                                </div>
+
+                                @* Output body — chỉ người liên quan mới thấy chi tiết *@
+                                @if (canViewDetail)
+                                {
+                                    <div class="output-card-body">
+                                        @* File đã nộp *@
+                                        @if (latestSub != null)
+                                        {
+                                            <div style="background:#f8fafc;border-radius:8px;padding:10px 12px;font-size:12.5px;margin-bottom:10px;">
+                                                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+                                                    <span><i class="bi bi-file-earmark me-1"></i>@latestSub.FileName</span>
+                                                    <a href="@latestSub.FilePath" download="@latestSub.FileName" class="btn-download">
+                                                        <i class="bi bi-download"></i> Tải xuống
+                                                    </a>
+                                                </div>
+                                                @if (!string.IsNullOrWhiteSpace(latestSub.Note))
+                                                {
+                                                    <div style="margin-top:5px;color:#475569;"><i class="bi bi-chat-left-text me-1"></i>@latestSub.Note</div>
+                                                }
+                                                @if (needsRev && !string.IsNullOrWhiteSpace(latestSub.ReviewComment))
+                                                {
+                                                    <div style="margin-top:5px;color:#c2410c;background:#fff7ed;padding:5px 8px;border-radius:5px;">
+                                                        <i class="bi bi-exclamation-triangle me-1"></i><strong>Sửa:</strong> @latestSub.ReviewComment
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+
+                                        @* Form nộp output *@
+                                        @if ((isAssignedUser || req.PrimaryAssigneeId == currentUserId || supportList.Contains(currentUserId))
+                                             && !isApproved && Model.Status == "Doing")
+                                        {
+                                            <form asp-action="UploadOutput" method="post" enctype="multipart/form-data"
+                                                  style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="requirementId" value="@req.Id" />
+                                                @if (!string.IsNullOrWhiteSpace(req.AllowedFileFormat) && req.AllowedFileFormat != "any")
+                                                {
+                                                    <div style="font-size:11px;color:#64748b;width:100%;">
+                                                        <i class="bi bi-info-circle me-1"></i>Yêu cầu: <strong>@req.AllowedFileFormat</strong>
+                                                    </div>
+                                                }
+                                                <input type="file" name="file" required
+                                                       style="flex:1;min-width:150px;border:1px solid #e2e8f0;border-radius:7px;padding:5px 8px;font-size:12px;background:#f8fafc;" />
+                                                <input type="text" name="note" placeholder="Ghi chú..."
+                                                       style="flex:1;min-width:120px;border:1px solid #e2e8f0;border-radius:7px;padding:5px 8px;font-size:12px;background:#f8fafc;" />
+                                                <button type="submit"
+                                                        style="background:#6366f1;color:white;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">
+                                                    <i class="bi bi-upload"></i> @(latestSub != null ? "Nộp lại" : "Nộp")
+                                                </button>
+                                            </form>
+                                        }
+
+                                        @* Form duyệt (Leader) *@
+                                        @if (isLeader && isPending)
+                                        {
+                                            <form asp-action="ReviewOutput" method="post"
+                                                  style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#f8fafc;padding:10px;border-radius:8px;margin-bottom:10px;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="submissionId" value="@latestSub!.Id" />
+                                                <input type="text" name="reviewComment" placeholder="Nhận xét..."
+                                                       style="flex:1;min-width:150px;border:1px solid #e2e8f0;border-radius:7px;padding:6px 10px;font-size:12px;background:#fff;" />
+                                                <button type="submit" name="reviewResult" value="Approved" class="btn-approve">
+                                                    <i class="bi bi-check-circle"></i> Đạt
+                                                </button>
+                                                <button type="submit" name="reviewResult" value="NeedsRevision" class="btn-reject">
+                                                    <i class="bi bi-arrow-repeat"></i> Sửa lại
+                                                </button>
+                                            </form>
+                                        }
+
+                                        @* Leader: Overdue + Extend cho OUTPUT
+                                           - Chỉ hiện khi chưa approved
+                                           - Không đạt: chỉ khi có deadline
+                                           - Gia hạn: luôn hiện để có thể set deadline mới *@
+                                        @if ((isLeader || User.IsInRole("Admin")) && !isApproved)
+                                        {
+                                            <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid #f1f5f9;">
+                                                @* Nút không đạt — chỉ khi có deadline và chưa overdue *@
+                                                @if (!req.IsOverdue && req.Deadline.HasValue)
+                                                {
+                                                    <form asp-action="MarkOutputOverdue" asp-controller="Tasks" method="post"
+                                                          style="display:flex;gap:5px;align-items:center;flex:1;min-width:180px;">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="requirementId" value="@req.Id" />
+                                                        <input type="hidden" name="taskId" value="@Model.TaskId" />
+                                                        <input type="text" name="reason" placeholder="Lý do không đạt..."
+                                                               style="flex:1;border:1px solid #fecaca;border-radius:7px;padding:5px 8px;font-size:11.5px;background:#fef9f9;" />
+                                                        <button type="submit" class="btn-overdue" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;"
+                                                                onclick="return confirm('Đánh không đạt tiến độ sản phẩm này?')">
+                                                            <i class="bi bi-x-circle"></i> Không đạt
+                                                        </button>
+                                                    </form>
+                                                }
+                                                @* Nút gia hạn — luôn hiện (kể cả chưa có deadline) *@
+                                                <form asp-action="ExtendOutputDeadline" asp-controller="Tasks" method="post"
+                                                      style="display:flex;gap:5px;align-items:center;flex:1;min-width:220px;">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="requirementId" value="@req.Id" />
+                                                    <input type="hidden" name="taskId" value="@Model.TaskId" />
+                                                    <div style="display:flex;flex-direction:column;gap:3px;flex:1;">
+                                                        @if (req.Deadline.HasValue)
+                                                        {
+                                                            <div style="font-size:10px;color:#92400e;">
+                                                                Hiện tại: @req.Deadline.Value.ToString("dd/MM/yyyy HH:mm")
+                                                            </div>
+                                                        }
+                                                        <input type="datetime-local" name="newDeadline"
+                                                               style="border:1px solid #fde68a;border-radius:7px;padding:5px 8px;font-size:11.5px;background:#fffbeb;width:100%;"
+                                                               min="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")" required />
+                                                    </div>
+                                                    <button type="submit" class="btn-extend" style="font-size:11.5px;padding:5px 9px;white-space:nowrap;">
+                                                        <i class="bi bi-calendar-plus"></i>
+                                                        @(req.Deadline.HasValue ? "Gia hạn" : "Đặt deadline")
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        }
+
+                                        @* Chat riêng output *@
+                                        @if (canViewChat)
+                                        {
+                                            var outputMsgs = outputChats.ContainsKey(req.Id) ? outputChats[req.Id] : new();
+                                            <div>
+                                                <button class="output-chat-toggle" onclick="toggleOutputChat(@req.Id)">
+                                                    <i class="bi bi-lock-fill" style="color:#6d28d9;font-size:11px;"></i>
+                                                    Trao đổi riêng
+                                                    <span class="private-badge">Riêng tư</span>
+                                                    <span style="font-size:11px;color:#94a3b8;">(@outputMsgs.Count tin)</span>
+                                                    <i class="bi bi-chevron-down" id="chevron_@req.Id" style="font-size:11px;"></i>
+                                                </button>
+                                                <div id="outputChat_@req.Id" style="display:none;margin-top:8px;">
+                                                    <div class="chat-wrap">
+                                                        <div class="chat-messages" id="outputMsgs_@req.Id" style="height:180px;">
+                                                            @if (!outputMsgs.Any())
+                                                            {
+                                                                <div class="chat-empty">🔒 Chưa có trao đổi nào</div>
+                                                            }
+                                                            @foreach (var c in outputMsgs)
+                                                            {
+                                                                var isMine = c.SenderId == currentUserId;
+                                                                var sName  = c.Sender?.FullName ?? "?";
+                                                                <div class="chat-bubble-wrap @(isMine ? "mine" : "")">
+                                                                    <div class="chat-av @(isMine ? "" : "other")">@sName.Substring(0,1).ToUpper()</div>
+                                                                    <div>
+                                                                        @if (!isMine) { <div class="chat-sender">@sName</div> }
+                                                                        <div class="chat-bubble @(isMine ? "mine" : "other")">
+                                                                            @c.Message
+                                                                            <div class="chat-time">@c.SentAt.ToString("HH:mm dd/MM")</div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                        <form asp-action="SendOutputComment" asp-controller="Tasks" method="post">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="requirementId" value="@req.Id" />
+                                                            <input type="hidden" name="taskId" value="@Model.TaskId" />
+                                                            <div class="chat-input-row">
+                                                                <input type="text" name="message" class="chat-input" placeholder="Nhắn tin..." required />
+                                                                <button type="submit" class="btn-send"><i class="bi bi-send"></i></button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    @* Người không có quyền xem chi tiết *@
+                                    <div class="output-locked">
+                                        <i class="bi bi-lock" style="font-size:18px;margin-bottom:4px;display:block;"></i>
+                                        Bạn không được chỉ định thực hiện sản phẩm này
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        @* Form thêm output (Leader) *@
+                        @if (isLeader && Model.Status != "Done")
+                        {
+                            <div style="border-top:1px solid #f1f5f9;padding-top:14px;margin-top:4px;">
+                                <div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:10px;">
+                                    <i class="bi bi-plus-circle me-1" style="color:#6366f1;"></i> Thêm sản phẩm yêu cầu mới
+                                </div>
+                                <form asp-action="AddOutputRequirement" method="post">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="taskId" value="@Model.TaskId" />
+                                    <div class="row g-2">
+                                        <div class="col-md-4">
+                                            <input type="text" name="name" required class="field-input" style="font-size:12.5px;padding:8px 10px;" placeholder="Tên sản phẩm *" />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <input type="text" name="description" class="field-input" style="font-size:12.5px;padding:8px 10px;" placeholder="Mô tả (tùy chọn)" />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <select name="allowedFileFormat" class="field-input" style="font-size:12.5px;padding:8px 10px;">
+                                                <option value="any">📁 Mọi định dạng</option>
+                                                <option value=".pdf">.pdf</option>
+                                                <option value=".docx">.docx</option>
+                                                <option value=".xlsx">.xlsx</option>
+                                                <option value=".zip">.zip</option>
+                                                <option value=".docx,.pdf">.docx hoặc .pdf</option>
+                                                <option value=".xlsx,.csv">.xlsx hoặc .csv</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="field-label">Hạn nộp</label>
+                                            <input type="datetime-local" name="deadline" class="field-input" style="font-size:12.5px;padding:8px 10px;" />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="field-label">Người thực hiện chính *</label>
+                                            <select name="primaryAssigneeId" class="field-input" style="font-size:12.5px;padding:8px 10px;" required>
+                                                <option value="">-- Chọn --</option>
+                                                @foreach (var u in allUsers)
+                                                {
+                                                    <option value="@u.UserId">@u.FullName</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="field-label">Người hỗ trợ</label>
+                                            <select name="supportAssigneeIds" class="field-input" style="font-size:12.5px;padding:8px 10px;min-height:72px;" multiple>
+                                                @foreach (var u in allUsers)
+                                                {
+                                                    <option value="@u.UserId">@u.FullName</option>
+                                                }
+                                            </select>
+                                            <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Ctrl+Click để chọn nhiều</div>
+                                        </div>
+                                        <div class="col-12 d-flex align-items-center gap-3">
+                                            <label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:#475569;cursor:pointer;">
+                                                <input type="checkbox" name="isRequired" value="true" checked style="width:15px;height:15px;" />
+                                                Bắt buộc
+                                            </label>
+                                            <button type="submit"
+                                                    style="background:#6366f1;color:white;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">
+                                                <i class="bi bi-plus-lg"></i> Thêm sản phẩm
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        }
+                    </div>
+                }@* end tab-output *@
+
+            </div>@* end detail-card *@
+        </div>@* end col-left *@
+
+        @* ══ CỘT PHẢI — CHAT CHUNG (sticky) ══ *@
+        <div class="chat-sticky">
+            <div class="detail-card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">
+                            <i class="bi bi-chat-dots" style="color:#6366f1;"></i> Trao đổi công việc
+                        </div>
+                        <div class="card-sub">Chat chung — tất cả thành viên</div>
+                    </div>
+                    <span style="background:#f1f5f9;color:#475569;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;">
+                        @taskComments.Count tin
+                    </span>
+                </div>
+                <div class="card-body" style="padding:12px 14px;">
+                    @if (isAssignedUser || isLeader || isGroupMember ||
+                         User.IsInRole("Admin") || User.IsInRole("SystemAdmin"))
+                    {
+                        <div class="chat-wrap">
+                            <div class="chat-messages" id="taskChatMessages">
+                                @if (!taskComments.Any())
+                                {
+                                    <div class="chat-empty">💬 Chưa có tin nhắn nào.<br/>Hãy bắt đầu trao đổi!</div>
+                                }
+                                @foreach (var c in taskComments)
+                                {
+                                    var isMine = c.SenderId == currentUserId;
+                                    var sName  = c.Sender?.FullName ?? "?";
+                                    <div class="chat-bubble-wrap @(isMine ? "mine" : "")">
+                                        <div class="chat-av @(isMine ? "" : "other")">@sName.Substring(0,1).ToUpper()</div>
+                                        <div>
+                                            @if (!isMine) { <div class="chat-sender">@sName</div> }
+                                            <div class="chat-bubble @(isMine ? "mine" : "other")">
+                                                @c.Message
+                                                <div class="chat-time">@c.SentAt.ToString("HH:mm dd/MM")</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            <form asp-action="SendTaskComment" asp-controller="Tasks" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="taskId" value="@Model.TaskId" />
+                                <div class="chat-input-row">
+                                    <input type="text" name="message" class="chat-input" placeholder="Nhập tin nhắn..." required />
+                                    <button type="submit" class="btn-send"><i class="bi bi-send"></i></button>
+                                </div>
+                            </form>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="text-align:center;padding:28px;color:#94a3b8;">
+                            <div style="font-size:28px;margin-bottom:6px;">🔒</div>
+                            <div style="font-size:13px;">Bạn không có quyền tham gia trao đổi</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>@* end col-right *@
+
+    </div>@* end detail-cols *@
+</div>@* end detail-wrapper *@
+
+<script>
+    // Tab switching
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        btn.classList.add('active');
+    }
+
+    // File upload
+    function onFileSelected(input) {
+        const info = document.getElementById('selectedFileInfo');
+        const name = document.getElementById('selectedFileName');
+        if (input.files && input.files[0]) {
+            name.textContent = input.files[0].name;
+            info.classList.add('show');
+        } else { info.classList.remove('show'); }
+    }
+    const zone = document.getElementById('uploadZone');
+    if (zone) {
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+        zone.addEventListener('drop', e => {
+            e.preventDefault(); zone.classList.remove('dragover');
+            const fi = document.getElementById('fileInput');
+            fi.files = e.dataTransfer.files;
+            onFileSelected(fi);
+        });
+    }
+
+    // Toggle output chat
+    function toggleOutputChat(reqId) {
+        const content = document.getElementById('outputChat_' + reqId);
+        const chevron = document.getElementById('chevron_' + reqId);
+        const isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? 'block' : 'none';
+        chevron.className = isHidden ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+        if (isHidden) {
+            const msgs = document.getElementById('outputMsgs_' + reqId);
+            if (msgs) msgs.scrollTop = msgs.scrollHeight;
+        }
+    }
+
+    // Auto scroll chat chung
+    const taskChat = document.getElementById('taskChatMessages');
+    if (taskChat) taskChat.scrollTop = taskChat.scrollHeight;
+</script>

@@ -1,0 +1,480 @@
+﻿@{
+    ViewData["Title"] = "Dashboard của tôi";
+
+    var todoTasks       = ViewBag.TodoTasks      as List<TaskManagement.Web.Models.TaskItem> ?? new();
+    var doingTasks      = ViewBag.DoingTasks     as List<TaskManagement.Web.Models.TaskItem> ?? new();
+    var upcomingTasks   = ViewBag.UpcomingTasks  as List<TaskManagement.Web.Models.TaskItem> ?? new();
+    var overdueTasks    = ViewBag.OverdueTasks   as List<TaskManagement.Web.Models.TaskItem> ?? new();
+    // Task bị Leader đánh Overdue (status = "Overdue")
+    var markedOverdue   = ViewBag.MarkedOverdue  as List<TaskManagement.Web.Models.TaskItem> ?? new();
+    var doneTasks       = ViewBag.DoneTasks      as List<TaskManagement.Web.Models.TaskItem> ?? new();
+    var outputCountDict = ViewBag.OutputCountDict as Dictionary<int, int> ?? new();
+    var userDict        = ViewBag.UserDict       as Dictionary<int, string> ?? new();
+    var now             = ViewBag.Now is DateTime dt ? dt : DateTime.Now;
+}
+
+<style>
+    .page-heading { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0; }
+    .page-sub     { font-size: 14px; color: #64748b; margin: 4px 0 0; }
+
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 28px; }
+    .summary-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px; text-align: center; position: relative; overflow: hidden; }
+    .summary-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 12px 12px 0 0; }
+    .summary-card.todo::before     { background: #94a3b8; }
+    .summary-card.doing::before    { background: #f59e0b; }
+    .summary-card.upcoming::before { background: #06b6d4; }
+    .summary-card.overdue::before  { background: #ef4444; }
+    .summary-card.done::before     { background: #10b981; }
+    .summary-value { font-size: 26px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+    .summary-label { font-size: 12px; color: #64748b; font-weight: 500; }
+    .summary-card.todo     .summary-value { color: #475569; }
+    .summary-card.doing    .summary-value { color: #b45309; }
+    .summary-card.upcoming .summary-value { color: #0e7490; }
+    .summary-card.overdue  .summary-value { color: #dc2626; }
+    .summary-card.done     .summary-value { color: #059669; }
+
+    .dash-section { margin-bottom: 28px; }
+    .section-title-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .section-title { font-size: 15px; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+    .section-count { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 20px; }
+    .count-todo     { background: #f1f5f9; color: #475569; }
+    .count-doing    { background: #fffbeb; color: #92400e; }
+    .count-upcoming { background: #ecfeff; color: #0e7490; }
+    .count-overdue  { background: #fef2f2; color: #dc2626; }
+    .count-done     { background: #ecfdf5; color: #065f46; }
+
+    .task-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+    .task-table thead th { background: #f8fafc; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #94a3b8; padding: 10px 16px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+    .task-table tbody td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-size: 13.5px; vertical-align: middle; }
+    .task-table tbody tr:last-child td { border-bottom: none; }
+    .task-table tbody tr:hover td { background: #fafafe; }
+    .task-table tbody tr.row-overdue td { background: #fef9f9; }
+    .task-table tbody tr.row-overdue:hover td { background: #fef2f2; }
+
+    .task-name  { font-weight: 700; color: #0f172a; font-size: 14px; }
+    .task-desc  { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .deadline-cell { font-size: 13px; font-weight: 600; }
+    .deadline-cell.danger  { color: #dc2626; }
+    .deadline-cell.warning { color: #d97706; }
+    .deadline-cell.normal  { color: #0f172a; }
+    .days-left { font-size: 11px; font-weight: 600; margin-top: 2px; }
+
+    .output-badge      { background: #eff6ff; color: #2563eb; border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+    .output-badge.none { background: #f8fafc; color: #94a3b8; }
+
+    .btn-view { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 7px; padding: 5px 12px; font-size: 12px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; transition: all .15s; white-space: nowrap; }
+    .btn-view:hover { background: #dbeafe; }
+
+    .empty-row td { text-align: center; padding: 28px; color: #94a3b8; font-size: 13px; }
+
+    .creator-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #475569; }
+    .creator-av   { width: 22px; height: 22px; border-radius: 5px; background: linear-gradient(135deg,#10b981,#059669); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: white; flex-shrink: 0; }
+
+    .alert-warn { background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 12px 16px; font-size: 13.5px; color: #991b1b; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .alert-info { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px 16px; font-size: 13.5px; color: #1e40af; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+
+    .collapse-toggle { background: none; border: none; color: #6366f1; font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; align-items: center; gap: 5px; }
+    .collapse-toggle:hover { text-decoration: underline; }
+</style>
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="page-heading">Dashboard của tôi</h1>
+        <p class="page-sub">Xin chào, <strong>@User.Identity!.Name</strong> — @now.ToString("dd/MM/yyyy HH:mm")</p>
+    </div>
+    <a asp-action="Index" asp-controller="Tasks"
+       style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:9px;padding:9px 18px;font-size:13.5px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+        <i class="bi bi-grid-1x2"></i> Tất cả công việc
+    </a>
+</div>
+
+<!-- Summary cards -->
+<div class="summary-grid">
+    <div class="summary-card todo">
+        <div class="summary-value">@todoTasks.Count</div>
+        <div class="summary-label">⭕ Chờ thực hiện</div>
+    </div>
+    <div class="summary-card doing">
+        <div class="summary-value">@doingTasks.Count</div>
+        <div class="summary-label">🔄 Đang thực hiện</div>
+    </div>
+    <div class="summary-card upcoming">
+        <div class="summary-value">@upcomingTasks.Count</div>
+        <div class="summary-label">⏰ Sắp quá hạn</div>
+    </div>
+    <div class="summary-card overdue">
+        <div class="summary-value">@overdueTasks.Count</div>
+        <div class="summary-label">🚨 Quá hạn</div>
+    </div>
+    <div class="summary-card" style="border-color:#fecaca;">
+        <div class="summary-value" style="color:#dc2626;">@markedOverdue.Count</div>
+        <div class="summary-label">❌ Không đạt tiến độ</div>
+    </div>
+    <div class="summary-card done">
+        <div class="summary-value">@doneTasks.Count</div>
+        <div class="summary-label">✅ Hoàn thành</div>
+    </div>
+</div>
+
+@if (overdueTasks.Any())
+{
+    <div class="alert-warn">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        Bạn có <strong>@overdueTasks.Count công việc quá hạn</strong> — cần xử lý ngay!
+    </div>
+}
+else if (upcomingTasks.Any())
+{
+    <div class="alert-info">
+        <i class="bi bi-clock-fill"></i>
+        Bạn có <strong>@upcomingTasks.Count công việc sắp quá hạn</strong> trong 3 ngày tới.
+    </div>
+}
+
+@* ── MACRO render bảng ── *@
+@functions {
+    string DeadlineCls(DateTime deadline, bool isDone, DateTime now)
+    {
+        if (isDone) return "normal";
+        if (deadline < now) return "danger";
+        if ((deadline - now).Days <= 1) return "warning";
+        return "normal";
+    }
+
+    string DaysLeftStr(DateTime deadline, bool isDone, DateTime now)
+    {
+        if (isDone) return "";
+        var days = (deadline - now).Days;
+        if (deadline < now) return $"Quá hạn {Math.Abs(days)} ngày";
+        if (days == 0) return "Hôm nay!";
+        if (days == 1) return "Còn 1 ngày";
+        return $"Còn {days} ngày";
+    }
+}
+
+@* ── 1. QUÁ HẠN ── *@
+@if (overdueTasks.Any())
+{
+    <div class="dash-section">
+        <div class="section-title-bar">
+            <div class="section-title">
+                <i class="bi bi-exclamation-circle-fill" style="color:#ef4444;"></i>
+                Công việc quá hạn
+                <span class="section-count count-overdue">@overdueTasks.Count</span>
+            </div>
+        </div>
+        <table class="task-table">
+            <thead>
+                <tr>
+                    <th>Tên công việc</th>
+                    <th>Ngày bắt đầu</th>
+                    <th>Hạn hoàn thành</th>
+                    <th>Sản phẩm cần nộp</th>
+                    <th>Người giao</th>
+                    <th style="text-align:center;">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in overdueTasks)
+                {
+                    var outputCount   = outputCountDict.ContainsKey(t.TaskId) ? outputCountDict[t.TaskId] : 0;
+                    var creatorName   = userDict.ContainsKey(t.CreatedBy) ? userDict[t.CreatedBy] : "?";
+                    var dCls          = DeadlineCls(t.Deadline, t.Status == "Done", now);
+                    var dStr          = DaysLeftStr(t.Deadline, t.Status == "Done", now);
+                    <tr class="row-overdue">
+                        <td>
+                            <div class="task-name">@t.Title</div>
+                            @if (!string.IsNullOrWhiteSpace(t.Description))
+                            {
+                                <div class="task-desc">@(t.Description.Length > 50 ? t.Description[..50] + "…" : t.Description)</div>
+                            }
+                        </td>
+                        <td style="font-size:13px;color:#64748b;">@t.CreatedAt.ToString("dd/MM/yyyy")</td>
+                        <td>
+                            <div class="deadline-cell @dCls"><i class="bi bi-calendar-event me-1" style="font-size:11px;"></i>@t.Deadline.ToString("dd/MM/yyyy HH:mm")</div>
+                            <div class="days-left" style="color:#dc2626;">@dStr</div>
+                        </td>
+                        <td>
+                            @if (outputCount > 0) { <span class="output-badge"><i class="bi bi-box-seam"></i> @outputCount sản phẩm</span> }
+                            else { <span class="output-badge none">Chưa có</span> }
+                        </td>
+                        <td>
+                            <div class="creator-chip">
+                                <div class="creator-av">@creatorName.Substring(0,1).ToUpper()</div>
+                                @creatorName
+                            </div>
+                        </td>
+                        <td style="text-align:center;">
+                            <a asp-action="Details" asp-controller="Tasks" asp-route-id="@t.TaskId" class="btn-view">
+                                <i class="bi bi-eye"></i> Xem
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@* ── 2. SẮP QUÁ HẠN ── *@
+<div class="dash-section">
+    <div class="section-title-bar">
+        <div class="section-title">
+            <i class="bi bi-alarm" style="color:#06b6d4;"></i>
+            Sắp quá hạn (3 ngày tới)
+            <span class="section-count count-upcoming">@upcomingTasks.Count</span>
+        </div>
+    </div>
+    <table class="task-table">
+        <thead>
+            <tr>
+                <th>Tên công việc</th><th>Ngày bắt đầu</th><th>Hạn hoàn thành</th>
+                <th>Sản phẩm cần nộp</th><th>Người giao</th><th style="text-align:center;">Thao tác</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!upcomingTasks.Any())
+            {
+                <tr><td colspan="6" style="text-align:center;padding:28px;color:#94a3b8;">🎉 Không có công việc nào sắp quá hạn</td></tr>
+            }
+            @foreach (var t in upcomingTasks)
+            {
+                var outputCount = outputCountDict.ContainsKey(t.TaskId) ? outputCountDict[t.TaskId] : 0;
+                var creatorName = userDict.ContainsKey(t.CreatedBy) ? userDict[t.CreatedBy] : "?";
+                var dCls        = DeadlineCls(t.Deadline, t.Status == "Done", now);
+                var dStr        = DaysLeftStr(t.Deadline, t.Status == "Done", now);
+                <tr>
+                    <td>
+                        <div class="task-name">@t.Title</div>
+                        @if (!string.IsNullOrWhiteSpace(t.Description))
+                        {
+                            <div class="task-desc">@(t.Description.Length > 50 ? t.Description[..50] + "…" : t.Description)</div>
+                        }
+                    </td>
+                    <td style="font-size:13px;color:#64748b;">@t.CreatedAt.ToString("dd/MM/yyyy")</td>
+                    <td>
+                        <div class="deadline-cell @dCls"><i class="bi bi-calendar-event me-1" style="font-size:11px;"></i>@t.Deadline.ToString("dd/MM/yyyy HH:mm")</div>
+                        <div class="days-left" style="color:@(dStr.Contains("Hôm nay") || dStr.Contains("1 ngày") ? "#d97706" : "#94a3b8");">@dStr</div>
+                    </td>
+                    <td>
+                        @if (outputCount > 0) { <span class="output-badge"><i class="bi bi-box-seam"></i> @outputCount sản phẩm</span> }
+                        else { <span class="output-badge none">Chưa có</span> }
+                    </td>
+                    <td>
+                        <div class="creator-chip">
+                            <div class="creator-av">@creatorName.Substring(0,1).ToUpper()</div>
+                            @creatorName
+                        </div>
+                    </td>
+                    <td style="text-align:center;">
+                        <a asp-action="Details" asp-controller="Tasks" asp-route-id="@t.TaskId" class="btn-view">
+                            <i class="bi bi-eye"></i> Xem
+                        </a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@* ── 3. CHỜ THỰC HIỆN ── *@
+<div class="dash-section">
+    <div class="section-title-bar">
+        <div class="section-title">
+            <i class="bi bi-circle" style="color:#94a3b8;"></i>
+            Chờ thực hiện
+            <span class="section-count count-todo">@todoTasks.Count</span>
+        </div>
+    </div>
+    <table class="task-table">
+        <thead>
+            <tr>
+                <th>Tên công việc</th><th>Ngày bắt đầu</th><th>Hạn hoàn thành</th>
+                <th>Sản phẩm cần nộp</th><th>Người giao</th><th style="text-align:center;">Thao tác</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!todoTasks.Any())
+            {
+                <tr><td colspan="6" style="text-align:center;padding:28px;color:#94a3b8;">Không có công việc nào chờ thực hiện</td></tr>
+            }
+            @foreach (var t in todoTasks)
+            {
+                var outputCount = outputCountDict.ContainsKey(t.TaskId) ? outputCountDict[t.TaskId] : 0;
+                var creatorName = userDict.ContainsKey(t.CreatedBy) ? userDict[t.CreatedBy] : "?";
+                var dCls        = DeadlineCls(t.Deadline, false, now);
+                var dStr        = DaysLeftStr(t.Deadline, false, now);
+                <tr>
+                    <td>
+                        <div class="task-name">@t.Title</div>
+                        @if (!string.IsNullOrWhiteSpace(t.Description))
+                        {
+                            <div class="task-desc">@(t.Description.Length > 50 ? t.Description[..50] + "…" : t.Description)</div>
+                        }
+                    </td>
+                    <td style="font-size:13px;color:#64748b;">@t.CreatedAt.ToString("dd/MM/yyyy")</td>
+                    <td>
+                        <div class="deadline-cell @dCls"><i class="bi bi-calendar-event me-1" style="font-size:11px;"></i>@t.Deadline.ToString("dd/MM/yyyy HH:mm")</div>
+                        @if (!string.IsNullOrWhiteSpace(dStr))
+                        {
+                            <div class="days-left" style="color:#94a3b8;">@dStr</div>
+                        }
+                    </td>
+                    <td>
+                        @if (outputCount > 0) { <span class="output-badge"><i class="bi bi-box-seam"></i> @outputCount sản phẩm</span> }
+                        else { <span class="output-badge none">Chưa có</span> }
+                    </td>
+                    <td>
+                        <div class="creator-chip">
+                            <div class="creator-av">@creatorName.Substring(0,1).ToUpper()</div>
+                            @creatorName
+                        </div>
+                    </td>
+                    <td style="text-align:center;">
+                        <a asp-action="Details" asp-controller="Tasks" asp-route-id="@t.TaskId" class="btn-view">
+                            <i class="bi bi-eye"></i> Xem
+                        </a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@* ── 4. ĐANG THỰC HIỆN ── *@
+<div class="dash-section">
+    <div class="section-title-bar">
+        <div class="section-title">
+            <i class="bi bi-arrow-clockwise" style="color:#f59e0b;"></i>
+            Đang thực hiện
+            <span class="section-count count-doing">@doingTasks.Count</span>
+        </div>
+    </div>
+    <table class="task-table">
+        <thead>
+            <tr>
+                <th>Tên công việc</th><th>Ngày bắt đầu</th><th>Hạn hoàn thành</th>
+                <th>Sản phẩm cần nộp</th><th>Người giao</th><th style="text-align:center;">Thao tác</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!doingTasks.Any())
+            {
+                <tr><td colspan="6" style="text-align:center;padding:28px;color:#94a3b8;">Không có công việc nào đang thực hiện</td></tr>
+            }
+            @foreach (var t in doingTasks)
+            {
+                var outputCount = outputCountDict.ContainsKey(t.TaskId) ? outputCountDict[t.TaskId] : 0;
+                var creatorName = userDict.ContainsKey(t.CreatedBy) ? userDict[t.CreatedBy] : "?";
+                var dCls        = DeadlineCls(t.Deadline, false, now);
+                var dStr        = DaysLeftStr(t.Deadline, false, now);
+                <tr>
+                    <td>
+                        <div class="task-name">@t.Title</div>
+                        @if (!string.IsNullOrWhiteSpace(t.Description))
+                        {
+                            <div class="task-desc">@(t.Description.Length > 50 ? t.Description[..50] + "…" : t.Description)</div>
+                        }
+                    </td>
+                    <td style="font-size:13px;color:#64748b;">@t.CreatedAt.ToString("dd/MM/yyyy")</td>
+                    <td>
+                        <div class="deadline-cell @dCls"><i class="bi bi-calendar-event me-1" style="font-size:11px;"></i>@t.Deadline.ToString("dd/MM/yyyy HH:mm")</div>
+                        @if (!string.IsNullOrWhiteSpace(dStr))
+                        {
+                            <div class="days-left" style="color:@(dStr.Contains("Quá hạn") ? "#dc2626" : dStr.Contains("Hôm nay") || dStr.Contains("1 ngày") ? "#d97706" : "#94a3b8");">@dStr</div>
+                        }
+                    </td>
+                    <td>
+                        @if (outputCount > 0) { <span class="output-badge"><i class="bi bi-box-seam"></i> @outputCount sản phẩm</span> }
+                        else { <span class="output-badge none">Chưa có</span> }
+                    </td>
+                    <td>
+                        <div class="creator-chip">
+                            <div class="creator-av">@creatorName.Substring(0,1).ToUpper()</div>
+                            @creatorName
+                        </div>
+                    </td>
+                    <td style="text-align:center;">
+                        <a asp-action="Details" asp-controller="Tasks" asp-route-id="@t.TaskId" class="btn-view">
+                            <i class="bi bi-eye"></i> Xem
+                        </a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@* ── 5. ĐÃ HOÀN THÀNH (collapsible) ── *@
+<div class="dash-section">
+    <div class="section-title-bar">
+        <div class="section-title">
+            <i class="bi bi-check-circle-fill" style="color:#10b981;"></i>
+            Đã hoàn thành
+            <span class="section-count count-done">@doneTasks.Count</span>
+        </div>
+        <button class="collapse-toggle" onclick="toggleDone()">
+            <i class="bi bi-chevron-down" id="doneChevron"></i> Hiện / Ẩn
+        </button>
+    </div>
+    <div id="doneSectionContent" style="display:none;">
+        <table class="task-table">
+            <thead>
+                <tr>
+                    <th>Tên công việc</th><th>Ngày bắt đầu</th><th>Hạn hoàn thành</th>
+                    <th>Sản phẩm cần nộp</th><th>Người giao</th><th style="text-align:center;">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!doneTasks.Any())
+                {
+                    <tr><td colspan="6" style="text-align:center;padding:28px;color:#94a3b8;">Chưa có công việc nào hoàn thành</td></tr>
+                }
+                @foreach (var t in doneTasks)
+                {
+                    var outputCount = outputCountDict.ContainsKey(t.TaskId) ? outputCountDict[t.TaskId] : 0;
+                    var creatorName = userDict.ContainsKey(t.CreatedBy) ? userDict[t.CreatedBy] : "?";
+                    <tr>
+                        <td>
+                            <div class="task-name">@t.Title</div>
+                            @if (!string.IsNullOrWhiteSpace(t.Description))
+                            {
+                                <div class="task-desc">@(t.Description.Length > 50 ? t.Description[..50] + "…" : t.Description)</div>
+                            }
+                        </td>
+                        <td style="font-size:13px;color:#64748b;">@t.CreatedAt.ToString("dd/MM/yyyy")</td>
+                        <td>
+                            <div class="deadline-cell normal"><i class="bi bi-calendar-event me-1" style="font-size:11px;"></i>@t.Deadline.ToString("dd/MM/yyyy HH:mm")</div>
+                        </td>
+                        <td>
+                            @if (outputCount > 0) { <span class="output-badge"><i class="bi bi-box-seam"></i> @outputCount sản phẩm</span> }
+                            else { <span class="output-badge none">Chưa có</span> }
+                        </td>
+                        <td>
+                            <div class="creator-chip">
+                                <div class="creator-av">@creatorName.Substring(0,1).ToUpper()</div>
+                                @creatorName
+                            </div>
+                        </td>
+                        <td style="text-align:center;">
+                            <a asp-action="Details" asp-controller="Tasks" asp-route-id="@t.TaskId" class="btn-view">
+                                <i class="bi bi-eye"></i> Xem
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function toggleDone() {
+        const content = document.getElementById('doneSectionContent');
+        const chevron = document.getElementById('doneChevron');
+        const isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? 'block' : 'none';
+        chevron.className = isHidden ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+    }
+</script>

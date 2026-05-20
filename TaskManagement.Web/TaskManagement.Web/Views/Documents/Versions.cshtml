@@ -1,0 +1,197 @@
+﻿@model IEnumerable<TaskManagement.Web.Models.Document>
+
+@{
+    ViewData["Title"] = "Lịch sử phiên bản";
+    var uploaderNames = ViewBag.UploaderNames as Dictionary<int, string> ?? new Dictionary<int, string>();
+    int groupId = ViewBag.GroupId ?? 0;
+    string docTitle = ViewBag.DocumentTitle ?? "Tài liệu";
+    var groupIdStr = groupId.ToString();
+}
+
+<style>
+    .page-heading { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0; }
+    .page-subheading { font-size: 14px; color: #64748b; margin: 4px 0 0; }
+    .section-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; margin-bottom: 20px; }
+    .section-header { padding: 18px 22px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
+    .section-header h5 { font-size: 15px; font-weight: 700; margin: 0; }
+    .section-header p  { font-size: 12px; color: #94a3b8; margin: 2px 0 0; }
+    .section-body { padding: 20px 22px; }
+
+    .version-item { border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; background: #fff; transition: box-shadow .2s; }
+    .version-item:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+    .version-item.latest { border-color: #c7d2fe; background: #fafafe; }
+    .version-item:last-child { margin-bottom: 0; }
+
+    .version-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .version-title { font-size: 15px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+    .version-badge { display: inline-flex; align-items: center; background: #6366f1; color: white; border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
+    .version-badge.old { background: #f1f5f9; color: #475569; }
+    .latest-tag { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+
+    .version-meta { font-size: 12px; color: #94a3b8; margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
+    .version-meta span { display: flex; align-items: center; gap: 4px; }
+
+    .btn-download { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: all .15s; }
+    .btn-download:hover { background: #dbeafe; }
+    .btn-delete-sm { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 7px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all .15s; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .btn-delete-sm:hover { background: #fee2e2; }
+    .btn-back { background: transparent; color: #475569; border: 1px solid #e2e8f0; border-radius: 9px; padding: 10px 20px; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; transition: all .2s; }
+    .btn-back:hover { background: #f8fafc; border-color: #94a3b8; color: #0f172a; }
+
+    .upload-zone { border: 2px dashed #e2e8f0; border-radius: 12px; padding: 20px; text-align: center; background: #f8fafc; transition: all .2s; cursor: pointer; position: relative; }
+    .upload-zone:hover { border-color: #6366f1; background: rgba(99,102,241,0.03); }
+    .file-input-hidden { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .selected-file { display: none; align-items: center; gap: 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; margin-top: 10px; font-size: 13px; color: #1e40af; font-weight: 500; }
+    .selected-file.show { display: flex; }
+    .field-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #475569; margin-bottom: 7px; display: block; }
+    .field-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 9px; padding: 10px 14px; font-size: 14px; font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; background: #f8fafc; transition: all .2s; outline: none; }
+    .field-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); background: #fff; }
+    .btn-primary-custom { background: #6366f1; color: white; border: none; border-radius: 8px; padding: 10px 20px; font-size: 13.5px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: background .2s; }
+    .btn-primary-custom:hover { background: #4f46e5; color: white; }
+
+    .alert-success-custom { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+    .alert-error-custom   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="page-heading">Lịch sử phiên bản</h1>
+        <p class="page-subheading">@docTitle — @Model.Count() phiên bản</p>
+    </div>
+    <a asp-action="Index" asp-controller="Documents" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Quay lại
+    </a>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert-success-custom"><i class="bi bi-check-circle-fill"></i> @TempData["SuccessMessage"]</div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert-error-custom"><i class="bi bi-exclamation-circle-fill"></i> @TempData["ErrorMessage"]</div>
+}
+
+<!-- Form cập nhật phiên bản mới -->
+<div class="section-card">
+    <div class="section-header">
+        <div>
+            <h5><i class="bi bi-arrow-up-circle me-2" style="color:#6366f1;"></i>Cập nhật phiên bản mới</h5>
+            <p>Upload file mới sẽ được lưu thành phiên bản tiếp theo</p>
+        </div>
+    </div>
+    <div class="section-body">
+        <form asp-action="UpdateVersion" asp-controller="Documents" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="groupId" value="@groupIdStr" />
+            <input type="hidden" name="title" value="@docTitle" />
+
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="field-label">Chọn file mới</label>
+                    <div class="upload-zone">
+                        <input type="file" name="file" class="file-input-hidden" id="versionFileInput" onchange="onVersionFileSelected(this)" />
+                        <div style="font-size:24px; color:#94a3b8; margin-bottom:6px;"><i class="bi bi-cloud-arrow-up"></i></div>
+                        <div style="font-size:14px; color:#475569; font-weight:500;">Click để chọn file phiên bản mới</div>
+                    </div>
+                    <div class="selected-file" id="versionFileInfo">
+                        <i class="bi bi-file-earmark-check" style="font-size:18px;"></i>
+                        <span id="versionFileName"></span>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label class="field-label">Ghi chú thay đổi (tùy chọn)</label>
+                    <input type="text" name="description" class="field-input" placeholder="Mô tả những thay đổi trong phiên bản này..." />
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn-primary-custom">
+                        <i class="bi bi-arrow-up-circle"></i> Cập nhật phiên bản
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Danh sách phiên bản -->
+<div class="section-card">
+    <div class="section-header">
+        <div>
+            <h5><i class="bi bi-clock-history me-2" style="color:#6366f1;"></i>Tất cả phiên bản</h5>
+        </div>
+    </div>
+    <div class="section-body">
+        @{
+            var docList = Model.ToList();
+            bool isFirst = true;
+        }
+        @foreach (var doc in docList)
+        {
+            var uploaderName = uploaderNames.ContainsKey(doc.UploadedBy) ? uploaderNames[doc.UploadedBy] : "Không xác định";
+            var docIdStr = doc.DocumentId.ToString();
+            var docFilePath = doc.FilePath ?? "";
+            var docFileName = doc.FileName ?? "";
+            var docDesc = doc.Description ?? "";
+            var versionStr = doc.Version.ToString();
+            var uploadTime = doc.UploadedAt.ToString("dd/MM/yyyy HH:mm");
+
+            var fileSizeStr = doc.FileSize < 1024 ? doc.FileSize + " B"
+                           : doc.FileSize < 1024 * 1024 ? (doc.FileSize / 1024) + " KB"
+                           : (doc.FileSize / (1024 * 1024)) + " MB";
+
+            <div class="version-item @(isFirst ? "latest" : "")">
+                <div class="version-header">
+                    <div>
+                        <div class="version-title">
+                            <i class="bi bi-file-earmark"></i>
+                            @docFileName
+                            <span class="version-badge @(isFirst ? "" : "old")">v@versionStr</span>
+                            @if (isFirst) { <span class="latest-tag">Mới nhất</span> }
+                        </div>
+                        <div class="version-meta">
+                            <span><i class="bi bi-person"></i> @uploaderName</span>
+                            <span><i class="bi bi-clock"></i> @uploadTime</span>
+                            <span><i class="bi bi-hdd"></i> @fileSizeStr</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(docDesc))
+                        {
+                            <div style="font-size:13px; color:#475569; margin-top:6px; background:#f8fafc; border-radius:7px; padding:8px 12px;">
+                                <i class="bi bi-chat-left-text me-1"></i> @docDesc
+                            </div>
+                        }
+                    </div>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <a href="@docFilePath" download="@docFileName" class="btn-download">
+                            <i class="bi bi-download"></i> Tải xuống
+                        </a>
+                        @if (User.IsInRole("Admin") || doc.UploadedBy == int.Parse(User.FindFirst("UserId")!.Value))
+                        {
+                            <form asp-action="Delete" asp-controller="Documents" method="post" style="display:inline;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="documentId" value="@docIdStr" />
+                                <button type="submit" class="btn-delete-sm" onclick="return confirm('Xóa phiên bản này?')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            isFirst = false;
+        }
+    </div>
+</div>
+
+<script>
+    function onVersionFileSelected(input) {
+        const info = document.getElementById('versionFileInfo');
+        const name = document.getElementById('versionFileName');
+        if (input.files && input.files[0]) {
+            name.textContent = input.files[0].name;
+            info.classList.add('show');
+        } else {
+            info.classList.remove('show');
+        }
+    }
+</script>

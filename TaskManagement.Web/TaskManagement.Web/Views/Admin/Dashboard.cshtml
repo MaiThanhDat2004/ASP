@@ -1,0 +1,204 @@
+﻿@{
+    ViewData["Title"] = "Dashboard Admin";
+    int totalTasks       = ViewBag.TotalTasks ?? 0;
+    int todoCount        = ViewBag.TodoCount ?? 0;
+    int doingCount       = ViewBag.DoingCount ?? 0;
+    int doneCount        = ViewBag.DoneCount ?? 0;
+    int overdueCount     = ViewBag.OverdueCount ?? 0;
+    int totalUsers       = ViewBag.TotalUsers ?? 0;
+    int pendingReviews   = ViewBag.PendingReviews ?? 0;
+    int totalSubmissions = ViewBag.TotalSubmissions ?? 0;
+
+    var upcomingTasks      = ViewBag.UpcomingTasks as List<TaskManagement.Web.Models.TaskItem> ?? new();
+    var pendingSubmissions = ViewBag.PendingSubmissions as List<TaskManagement.Web.Models.TaskSubmission> ?? new();
+    var userDict           = ViewBag.UserDict as Dictionary<int, string> ?? new();
+    var taskDict           = ViewBag.SubmissionTaskDict as Dictionary<int, string> ?? new();
+}
+
+<style>
+    .dash-heading { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0; }
+    .dash-sub     { font-size: 14px; color: #64748b; margin: 4px 0 0; }
+
+    /* Stat cards */
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 8px; transition: box-shadow .2s; }
+    .stat-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
+    .stat-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .stat-value { font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1; }
+    .stat-label { font-size: 13px; color: #64748b; font-weight: 500; }
+
+    /* Section card */
+    .section-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; margin-bottom: 20px; }
+    .section-header { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
+    .section-header h5 { font-size: 15px; font-weight: 700; margin: 0; }
+    .section-body { padding: 0; }
+
+    /* Table */
+    .dash-table { width: 100%; border-collapse: collapse; }
+    .dash-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; padding: 12px 20px; border-bottom: 1px solid #f1f5f9; text-align: left; background: #f8fafc; }
+    .dash-table td { padding: 13px 20px; border-bottom: 1px solid #f8fafc; font-size: 13.5px; color: #0f172a; vertical-align: middle; }
+    .dash-table tr:last-child td { border-bottom: none; }
+    .dash-table tr:hover td { background: #fafafe; }
+
+    .badge-todo     { background: #f1f5f9; color: #475569; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
+    .badge-doing    { background: #eff6ff; color: #2563eb; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
+    .badge-done     { background: #ecfdf5; color: #065f46; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
+    .badge-overdue  { background: #fef2f2; color: #dc2626; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
+    .badge-pending  { background: #fffbeb; color: #92400e; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
+
+    .btn-link-sm { color: #6366f1; font-size: 12px; font-weight: 700; text-decoration: none; }
+    .btn-link-sm:hover { text-decoration: underline; }
+
+    .empty-state { text-align: center; padding: 32px; color: #94a3b8; font-size: 14px; }
+
+    /* Progress bar */
+    .progress-wrap { background: #f1f5f9; border-radius: 99px; height: 6px; overflow: hidden; margin-top: 6px; }
+    .progress-fill { height: 100%; border-radius: 99px; transition: width .5s; }
+</style>
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="dash-heading">Dashboard</h1>
+        <p class="dash-sub">Tổng quan hệ thống — @DateTime.Now.ToString("dd/MM/yyyy")</p>
+    </div>
+    <a asp-controller="Admin" asp-action="Submissions" class="btn" style="background:#6366f1;color:white;border-radius:9px;font-weight:700;font-size:13.5px;padding:10px 18px;display:inline-flex;align-items:center;gap:6px;">
+        <i class="bi bi-inbox"></i> Duyệt submissions @(pendingReviews > 0 ? $"({pendingReviews})" : "")
+    </a>
+</div>
+
+<!-- Stat cards -->
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#eff6ff;color:#2563eb;"><i class="bi bi-list-task"></i></div>
+        <div class="stat-value">@totalTasks</div>
+        <div class="stat-label">Tổng công việc</div>
+        <div class="progress-wrap"><div class="progress-fill" style="width:100%;background:#2563eb;"></div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#f1f5f9;color:#475569;"><i class="bi bi-circle"></i></div>
+        <div class="stat-value">@todoCount</div>
+        <div class="stat-label">Chưa làm</div>
+        <div class="progress-wrap"><div class="progress-fill" style="width:@(totalTasks > 0 ? (todoCount * 100 / totalTasks) : 0)%;background:#94a3b8;"></div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#eff6ff;color:#3b82f6;"><i class="bi bi-arrow-repeat"></i></div>
+        <div class="stat-value">@doingCount</div>
+        <div class="stat-label">Đang làm</div>
+        <div class="progress-wrap"><div class="progress-fill" style="width:@(totalTasks > 0 ? (doingCount * 100 / totalTasks) : 0)%;background:#3b82f6;"></div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#ecfdf5;color:#059669;"><i class="bi bi-check-circle"></i></div>
+        <div class="stat-value">@doneCount</div>
+        <div class="stat-label">Hoàn thành</div>
+        <div class="progress-wrap"><div class="progress-fill" style="width:@(totalTasks > 0 ? (doneCount * 100 / totalTasks) : 0)%;background:#059669;"></div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#fef2f2;color:#dc2626;"><i class="bi bi-exclamation-triangle"></i></div>
+        <div class="stat-value">@overdueCount</div>
+        <div class="stat-label">Quá hạn</div>
+        <div class="progress-wrap"><div class="progress-fill" style="width:@(totalTasks > 0 ? (overdueCount * 100 / totalTasks) : 0)%;background:#dc2626;"></div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#f5f3ff;color:#7c3aed;"><i class="bi bi-people"></i></div>
+        <div class="stat-value">@totalUsers</div>
+        <div class="stat-label">Thành viên</div>
+        <div class="progress-wrap"><div class="progress-fill" style="width:100%;background:#7c3aed;"></div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#fffbeb;color:#d97706;"><i class="bi bi-hourglass-split"></i></div>
+        <div class="stat-value">@pendingReviews</div>
+        <div class="stat-label">Chờ duyệt</div>
+        <div class="progress-wrap"><div class="progress-fill" style="width:@(totalSubmissions > 0 ? (pendingReviews * 100 / totalSubmissions) : 0)%;background:#d97706;"></div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#ecfdf5;color:#059669;"><i class="bi bi-upload"></i></div>
+        <div class="stat-value">@totalSubmissions</div>
+        <div class="stat-label">Tổng bài nộp</div>
+        <div class="progress-wrap"><div class="progress-fill" style="width:100%;background:#059669;"></div></div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Task sắp hết hạn -->
+    <div class="col-lg-6">
+        <div class="section-card">
+            <div class="section-header">
+                <h5><i class="bi bi-alarm me-2" style="color:#ef4444;"></i>Sắp hết hạn (3 ngày tới)</h5>
+                <a asp-controller="Tasks" asp-action="Index" class="btn-link-sm">Xem tất cả →</a>
+            </div>
+            <div class="section-body">
+                @if (upcomingTasks.Any())
+                {
+                    <table class="dash-table">
+                        <thead>
+                            <tr><th>Công việc</th><th>Người làm</th><th>Hạn</th><th>Trạng thái</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in upcomingTasks)
+                            {
+                                var assignedName = t.AssignedTo.HasValue && userDict.ContainsKey(t.AssignedTo.Value)
+                                    ? userDict[t.AssignedTo.Value] : "—";
+                                var daysLeft = (t.Deadline - DateTime.Now).Days;
+                                var daysStr = daysLeft == 0 ? "Hôm nay" : $"{daysLeft} ngày";
+                                <tr>
+                                    <td style="font-weight:600;">@t.Title</td>
+                                    <td style="color:#64748b;">@assignedName</td>
+                                    <td><span class="badge-overdue">@daysStr</span></td>
+                                    <td>
+                                        @if (t.Status == "Todo")  { <span class="badge-todo">Todo</span> }
+                                        else if (t.Status == "Doing") { <span class="badge-doing">Doing</span> }
+                                        else { <span class="badge-done">Done</span> }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="empty-state">✅ Không có task nào sắp hết hạn</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Submissions chờ duyệt -->
+    <div class="col-lg-6">
+        <div class="section-card">
+            <div class="section-header">
+                <h5><i class="bi bi-inbox me-2" style="color:#f59e0b;"></i>Bài nộp chờ duyệt</h5>
+                <a asp-controller="Admin" asp-action="Submissions" class="btn-link-sm">Xem tất cả →</a>
+            </div>
+            <div class="section-body">
+                @if (pendingSubmissions.Any())
+                {
+                    <table class="dash-table">
+                        <thead>
+                            <tr><th>File</th><th>Người nộp</th><th>Công việc</th><th>Thời gian</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in pendingSubmissions)
+                            {
+                                var submitterName = userDict.ContainsKey(s.SubmittedBy) ? userDict[s.SubmittedBy] : "—";
+                                var taskTitle = taskDict.ContainsKey(s.TaskId) ? taskDict[s.TaskId] : "—";
+                                var timeStr = s.SubmittedAt.ToString("HH:mm dd/MM");
+                                var sFileName = s.FileName ?? "";
+                                <tr>
+                                    <td style="font-weight:600; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">@sFileName</td>
+                                    <td style="color:#64748b;">@submitterName</td>
+                                    <td style="color:#64748b; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">@taskTitle</td>
+                                    <td><span class="badge-pending">@timeStr</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="empty-state">✅ Không có bài nộp nào chờ duyệt</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

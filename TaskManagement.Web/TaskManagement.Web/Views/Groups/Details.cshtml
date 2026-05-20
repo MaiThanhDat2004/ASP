@@ -1,0 +1,169 @@
+﻿@model TaskManagement.Web.Models.Group
+@using TaskManagement.Web.Models
+
+@{
+    ViewData["Title"] = Model.Name;
+    string myRole = ViewBag.MyRole ?? "Member";
+    int currentUserId = ViewBag.CurrentUserId ?? 0;
+    var availableUsers = ViewBag.AvailableUsers as List<User> ?? new List<User>();
+    bool isLeader = myRole == "Leader";
+}
+
+<style>
+    .page-heading { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0; }
+    .page-sub     { font-size: 14px; color: #64748b; margin: 4px 0 0; }
+
+    .section-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; margin-bottom: 20px; }
+    .section-header { padding: 16px 22px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
+    .section-header h5 { font-size: 15px; font-weight: 700; margin: 0; }
+
+    .member-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 22px; border-bottom: 1px solid #f8fafc; }
+    .member-row:last-child { border-bottom: none; }
+    .member-avatar { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; color: white; flex-shrink: 0; }
+    .member-name  { font-size: 14px; font-weight: 600; color: #0f172a; }
+    .member-email { font-size: 12px; color: #94a3b8; }
+
+    .role-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+    .role-leader { background: #fef3c7; color: #92400e; }
+    .role-member { background: #eff6ff; color: #1e40af; }
+
+    .btn-sm-danger  { background: #fef2f2; color: #ef4444; border: 1px solid #fecaca; border-radius: 7px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .btn-sm-danger:hover { background: #ef4444; color: white; }
+    .btn-sm-indigo  { background: #eff6ff; color: #6366f1; border: 1px solid #c7d2fe; border-radius: 7px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .btn-sm-indigo:hover { background: #6366f1; color: white; }
+
+    .btn-primary-custom { background: #6366f1; color: white; border: none; border-radius: 9px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background .2s; text-decoration: none; }
+    .btn-primary-custom:hover { background: #4f46e5; color: white; }
+    .btn-danger-custom { background: #fef2f2; color: #ef4444; border: 1px solid #fecaca; border-radius: 9px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-danger-custom:hover { background: #ef4444; color: white; }
+
+    .add-member-form { padding: 16px 22px; background: #f8fafc; border-top: 1px solid #f1f5f9; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .field-select { border: 1px solid #e2e8f0; border-radius: 9px; padding: 9px 13px; font-size: 13.5px; font-family: 'Plus Jakarta Sans', sans-serif; outline: none; background: #fff; flex: 1; min-width: 180px; }
+    .field-select:focus { border-color: #6366f1; }
+
+    .alert-success-custom { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+    .alert-error-custom   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+
+    .my-role-box { background: @(isLeader ? "#fefce8" : "#eff6ff"); border: 1px solid @(isLeader ? "#fde68a" : "#bfdbfe"); border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 600; color: @(isLeader ? "#92400e" : "#1e40af"); display: inline-flex; align-items: center; gap: 6px; }
+</style>
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="page-heading">@Model.Name</h1>
+        <p class="page-sub">@(string.IsNullOrWhiteSpace(Model.Description) ? "Chưa có mô tả" : Model.Description)</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <div class="my-role-box">
+            @(isLeader ? "👑 Trưởng nhóm" : "👤 Thành viên")
+        </div>
+        @if (isLeader)
+        {
+            <form asp-action="Delete" asp-controller="Groups" method="post"
+                  onsubmit="return confirm('Xóa nhóm này? Tất cả dữ liệu liên quan sẽ bị xóa!')">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@Model.GroupId" />
+                <button type="submit" class="btn-danger-custom">
+                    <i class="bi bi-trash"></i> Xóa nhóm
+                </button>
+            </form>
+        }
+        <a asp-action="Index" asp-controller="Groups" class="btn-primary-custom" style="background:#f1f5f9; color:#475569;">
+            <i class="bi bi-arrow-left"></i> Quay lại
+        </a>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert-success-custom"><i class="bi bi-check-circle-fill"></i> @TempData["SuccessMessage"]</div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert-error-custom"><i class="bi bi-exclamation-circle-fill"></i> @TempData["ErrorMessage"]</div>
+}
+
+<!-- Danh sách thành viên -->
+<div class="section-card">
+    <div class="section-header">
+        <h5><i class="bi bi-people me-2" style="color:#6366f1;"></i>Thành viên (@Model.Members.Count)</h5>
+    </div>
+
+    @foreach (var member in Model.Members.OrderBy(m => m.Role == "Leader" ? 0 : 1))
+    {
+        var initials = member.User?.FullName?.Length > 0
+            ? member.User.FullName.Substring(0, 1).ToUpper() : "?";
+        var isCurrentUser = member.UserId == currentUserId;
+
+        <div class="member-row">
+            <div class="d-flex align-items-center gap-3">
+                <div class="member-avatar">@initials</div>
+                <div>
+                    <div class="member-name">
+                        @member.User?.FullName
+                        @if (isCurrentUser) { <span style="font-size:11px; color:#94a3b8;">(bạn)</span> }
+                    </div>
+                    <div class="member-email">@member.User?.Email</div>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="role-badge @(member.Role == "Leader" ? "role-leader" : "role-member")">
+                    @(member.Role == "Leader" ? "👑 Trưởng nhóm" : "👤 Thành viên")
+                </span>
+
+                @if (isLeader && !isCurrentUser)
+                {
+                    <!-- Đổi vai trò -->
+                    <form asp-action="ChangeRole" asp-controller="Groups" method="post" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="groupId" value="@Model.GroupId" />
+                        <input type="hidden" name="memberId" value="@member.UserId" />
+                        <input type="hidden" name="newRole" value="@(member.Role == "Leader" ? "Member" : "Leader")" />
+                        <button type="submit" class="btn-sm-indigo">
+                            @(member.Role == "Leader" ? "Hạ xuống Member" : "Thăng Leader")
+                        </button>
+                    </form>
+
+                    <!-- Xóa thành viên -->
+                    <form asp-action="RemoveMember" asp-controller="Groups" method="post" class="d-inline"
+                          onsubmit="return confirm('Xóa thành viên này khỏi nhóm?')">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="groupId" value="@Model.GroupId" />
+                        <input type="hidden" name="userId" value="@member.UserId" />
+                        <button type="submit" class="btn-sm-danger">
+                            <i class="bi bi-x"></i> Xóa
+                        </button>
+                    </form>
+                }
+            </div>
+        </div>
+    }
+
+    @if (isLeader && availableUsers.Any())
+    {
+        <form asp-action="AddMember" asp-controller="Groups" method="post" class="add-member-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="groupId" value="@Model.GroupId" />
+            <select name="userId" class="field-select" required>
+                <option value="">-- Chọn thành viên --</option>
+                @foreach (var u in availableUsers)
+                {
+                    <option value="@u.UserId">@u.FullName (@u.Email)</option>
+                }
+            </select>
+            <select name="role" class="field-select" style="flex: 0; width: 160px;">
+                <option value="Member">👤 Thành viên</option>
+                <option value="Leader">👑 Trưởng nhóm</option>
+            </select>
+            <button type="submit" class="btn-primary-custom">
+                <i class="bi bi-plus-lg"></i> Thêm
+            </button>
+        </form>
+    }
+    else if (isLeader && !availableUsers.Any())
+    {
+        <div style="padding: 16px 22px; font-size: 13px; color: #94a3b8;">
+            Tất cả người dùng đã trong nhóm.
+        </div>
+    }
+</div>

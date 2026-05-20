@@ -1,0 +1,64 @@
+# Visual Studio
+
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build results
+
+bin/
+obj/
+
+# Visual Studio Code
+
+.vscode/
+
+# Logs
+
+*.log
+
+# OS generated files
+
+.DS_Store
+Thumbs.db
+
+# NuGet
+
+*.nupkg
+packages/
+!packages/build/
+
+# ASP.NET Scaffolding
+
+ScaffoldingReadMe.txt
+
+# IIS Express
+
+/.vs
+/IISExpress
+
+# Rider
+
+.idea/
+
+# Visual Studio profiler
+
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# Test results
+
+TestResults/
+
+# Publish output
+
+publish/
+
+# Local database
+
+*.mdf
+*.ldf

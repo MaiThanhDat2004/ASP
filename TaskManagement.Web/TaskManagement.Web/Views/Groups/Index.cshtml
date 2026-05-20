@@ -1,0 +1,95 @@
+﻿@model IEnumerable<TaskManagement.Web.Models.Group>
+@using TaskManagement.Web.Models
+
+@{
+    ViewData["Title"] = "Nhóm của tôi";
+    var myRoles = ViewBag.MyRoles as Dictionary<int, string> ?? new Dictionary<int, string>();
+    int currentUserId = ViewBag.CurrentUserId ?? 0;
+}
+
+<style>
+    .page-heading { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0; }
+    .page-sub     { font-size: 14px; color: #64748b; margin: 4px 0 0; }
+
+    .group-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 22px; transition: all .2s; text-decoration: none; display: block; color: inherit; }
+    .group-card:hover { border-color: #6366f1; box-shadow: 0 4px 20px rgba(99,102,241,0.1); transform: translateY(-2px); }
+
+    .group-icon { width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 14px; }
+    .group-name { font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
+    .group-desc { font-size: 13px; color: #64748b; margin-bottom: 14px; min-height: 36px; }
+    .group-meta { display: flex; align-items: center; justify-content: space-between; }
+
+    .role-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+    .role-leader { background: #fef3c7; color: #92400e; }
+    .role-member { background: #eff6ff; color: #1e40af; }
+
+    .member-count { font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 4px; }
+
+    .btn-create { background: #6366f1; color: white; border: none; border-radius: 9px; padding: 10px 20px; font-size: 14px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; transition: background .2s; }
+    .btn-create:hover { background: #4f46e5; color: white; }
+
+    .empty-state { text-align: center; padding: 60px 20px; }
+    .empty-icon  { font-size: 48px; margin-bottom: 16px; }
+    .empty-title { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+    .empty-sub   { font-size: 14px; color: #64748b; margin-bottom: 24px; }
+
+    .alert-success-custom { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+    .alert-error-custom   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+</style>
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="page-heading">Nhóm của tôi</h1>
+        <p class="page-sub">Các nhóm bạn đang tham gia</p>
+    </div>
+    <a asp-action="Create" asp-controller="Groups" class="btn-create">
+        <i class="bi bi-plus-lg"></i> Tạo nhóm mới
+    </a>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert-success-custom"><i class="bi bi-check-circle-fill"></i> @TempData["SuccessMessage"]</div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert-error-custom"><i class="bi bi-exclamation-circle-fill"></i> @TempData["ErrorMessage"]</div>
+}
+
+@if (!Model.Any())
+{
+    <div class="empty-state">
+        <div class="empty-icon">👥</div>
+        <div class="empty-title">Bạn chưa có nhóm nào</div>
+        <div class="empty-sub">Tạo nhóm mới hoặc chờ được mời tham gia</div>
+        <a asp-action="Create" asp-controller="Groups" class="btn-create">
+            <i class="bi bi-plus-lg"></i> Tạo nhóm đầu tiên
+        </a>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var group in Model)
+        {
+            var role = myRoles.ContainsKey(group.GroupId) ? myRoles[group.GroupId] : "Member";
+            var roleClass = role == "Leader" ? "role-leader" : "role-member";
+            var roleLabel = role == "Leader" ? "👑 Trưởng nhóm" : "👤 Thành viên";
+
+            <div class="col-md-4 col-sm-6">
+                <a asp-action="Details" asp-controller="Groups" asp-route-id="@group.GroupId" class="group-card">
+                    <div class="group-icon">👥</div>
+                    <div class="group-name">@group.Name</div>
+                    <div class="group-desc">@(string.IsNullOrWhiteSpace(group.Description) ? "Chưa có mô tả" : group.Description)</div>
+                    <div class="group-meta">
+                        <span class="role-badge @roleClass">@roleLabel</span>
+                        <span class="member-count">
+                            <i class="bi bi-people"></i> @group.Members.Count thành viên
+                        </span>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}

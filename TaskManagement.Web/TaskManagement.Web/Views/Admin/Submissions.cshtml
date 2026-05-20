@@ -1,0 +1,212 @@
+﻿@model IEnumerable<TaskManagement.Web.Models.TaskSubmission>
+
+@{
+    ViewData["Title"] = "Duyệt bài nộp";
+    string filter          = ViewBag.Filter ?? "pending";
+    int pendingCount       = ViewBag.PendingCount ?? 0;
+    int approvedCount      = ViewBag.ApprovedCount ?? 0;
+    int needsRevisionCount = ViewBag.NeedsRevisionCount ?? 0;
+    var taskDict           = ViewBag.TaskDict as Dictionary<int, string> ?? new();
+    var userDict           = ViewBag.UserDict as Dictionary<int, string> ?? new();
+}
+
+<style>
+    .page-heading { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0; }
+    .page-sub     { font-size: 14px; color: #64748b; margin: 4px 0 0; }
+
+    .filter-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .filter-tab { padding: 8px 18px; border-radius: 99px; font-size: 13px; font-weight: 700; text-decoration: none; border: 1px solid #e2e8f0; color: #475569; background: #fff; transition: all .15s; display: inline-flex; align-items: center; gap: 6px; }
+    .filter-tab:hover { border-color: #6366f1; color: #6366f1; }
+    .filter-tab.active { background: #6366f1; color: white; border-color: #6366f1; }
+    .filter-tab .count { background: rgba(255,255,255,0.25); border-radius: 99px; padding: 1px 7px; font-size: 11px; }
+    .filter-tab:not(.active) .count { background: #f1f5f9; color: #64748b; }
+
+    .section-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
+    .sub-item { border-bottom: 1px solid #f1f5f9; padding: 18px 22px; transition: background .15s; }
+    .sub-item:last-child { border-bottom: none; }
+    .sub-item:hover { background: #fafafe; }
+
+    .sub-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .sub-file { font-size: 15px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 7px; }
+    .sub-meta { font-size: 12px; color: #94a3b8; margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .sub-meta span { display: flex; align-items: center; gap: 4px; }
+
+    .badge-approved       { background: #ecfdf5; color: #065f46; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; display:inline-flex; align-items:center; gap:4px; }
+    .badge-needs-revision { background: #fff7ed; color: #c2410c; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; display:inline-flex; align-items:center; gap:4px; }
+    .badge-pending        { background: #fffbeb; color: #92400e; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; display:inline-flex; align-items:center; gap:4px; }
+
+    .round-badge { background: #f1f5f9; color: #475569; border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+
+    .btn-download { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+    .btn-approve  { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; display: inline-flex; align-items: center; gap: 5px; }
+    .btn-reject   { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; display: inline-flex; align-items: center; gap: 5px; }
+    .btn-approve:hover { background: #d1fae5; }
+    .btn-reject:hover  { background: #ffedd5; }
+
+    .review-form { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .review-input { flex: 1; min-width: 200px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-family: 'Plus Jakarta Sans', sans-serif; outline: none; }
+    .review-input:focus { border-color: #6366f1; }
+
+    .note-box     { margin-top:6px; font-size:12.5px; color:#475569; background:#f8fafc; border-radius:7px; padding:6px 10px; }
+    .comment-box  { margin-top:6px; font-size:12.5px; color:#475569; background:#f0fdf4; border-radius:7px; padding:6px 10px; }
+    .revision-box { margin-top:6px; font-size:12.5px; color:#c2410c; background:#fff7ed; border: 1px solid #fed7aa; border-radius:7px; padding:6px 10px; }
+
+    .empty-state { text-align: center; padding: 48px; color: #94a3b8; }
+    .task-link { color: #6366f1; font-weight: 700; text-decoration: none; font-size: 12px; }
+    .task-link:hover { text-decoration: underline; }
+    .alert-success-custom { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+    .alert-error-custom   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="page-heading">Duyệt bài nộp</h1>
+        <p class="page-sub">Xem xét và đánh giá kết quả công việc của thành viên</p>
+    </div>
+    <a asp-controller="Admin" asp-action="Dashboard"
+       style="background:transparent;border:1px solid #e2e8f0;border-radius:9px;font-weight:600;font-size:13.5px;padding:9px 16px;display:inline-flex;align-items:center;gap:6px;color:#475569;text-decoration:none;">
+        <i class="bi bi-arrow-left"></i> Dashboard
+    </a>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert-success-custom"><i class="bi bi-check-circle-fill"></i> @TempData["SuccessMessage"]</div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert-error-custom"><i class="bi bi-exclamation-circle-fill"></i> @TempData["ErrorMessage"]</div>
+}
+
+<!-- Filter tabs -->
+<div class="filter-tabs">
+    <a asp-action="Submissions" asp-route-filter="pending"
+       class="filter-tab @(filter == "pending" ? "active" : "")">
+        <i class="bi bi-hourglass-split"></i> Chờ duyệt <span class="count">@pendingCount</span>
+    </a>
+    <a asp-action="Submissions" asp-route-filter="approved"
+       class="filter-tab @(filter == "approved" ? "active" : "")">
+        <i class="bi bi-check-circle"></i> Đã duyệt <span class="count">@approvedCount</span>
+    </a>
+    <a asp-action="Submissions" asp-route-filter="needsrevision"
+       class="filter-tab @(filter == "needsrevision" ? "active" : "")">
+        <i class="bi bi-arrow-repeat"></i> Cần sửa lại <span class="count">@needsRevisionCount</span>
+    </a>
+</div>
+
+<!-- Danh sách -->
+<div class="section-card">
+    @if (Model.Any())
+    {
+        @foreach (var sub in Model)
+        {
+            var submitterName = userDict.ContainsKey(sub.SubmittedBy) ? userDict[sub.SubmittedBy] : "—";
+            var taskTitle     = taskDict.ContainsKey(sub.TaskId) ? taskDict[sub.TaskId] : "—";
+            var sFileName     = sub.FileName ?? "";
+            var sFilePath     = sub.FilePath ?? "";
+            var sNote         = sub.Note ?? "";
+            var sComment      = sub.ReviewComment ?? sub.AdminComment ?? "";
+            var sIdStr        = sub.SubmissionId.ToString();
+            var sTime         = sub.SubmittedAt.ToString("HH:mm dd/MM/yyyy");
+
+            var dotIdx    = sFileName.LastIndexOf('.');
+            var ext       = dotIdx >= 0 ? sFileName.Substring(dotIdx).ToLower() : "";
+            var iconClass = ext == ".pdf"  ? "bi bi-file-earmark-pdf text-danger"
+                          : ext == ".doc" || ext == ".docx" ? "bi bi-file-earmark-word text-primary"
+                          : ext == ".xls" || ext == ".xlsx" ? "bi bi-file-earmark-excel text-success"
+                          : ext == ".zip" ? "bi bi-file-earmark-zip text-warning"
+                          : "bi bi-file-earmark";
+
+            <div class="sub-item">
+                <div class="sub-header">
+                    <div style="flex:1;">
+                        <div class="sub-file">
+                            <i class="@iconClass" style="font-size:18px;"></i>
+                            @sFileName
+                            @if (sub.SubmissionRound > 1)
+                            {
+                                <span class="round-badge">Lần @sub.SubmissionRound</span>
+                            }
+                        </div>
+                        <div class="sub-meta">
+                            <span><i class="bi bi-person"></i> @submitterName</span>
+                            <span><i class="bi bi-list-task"></i>
+                                <a asp-controller="Tasks" asp-action="Details"
+                                   asp-route-id="@sub.TaskId.ToString()" class="task-link">@taskTitle</a>
+                            </span>
+                            <span><i class="bi bi-clock"></i> @sTime</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(sNote))
+                        {
+                            <div class="note-box">
+                                <i class="bi bi-chat-left-text me-1"></i> @sNote
+                            </div>
+                        }
+                        @if (sub.Status == "NeedsRevision" && !string.IsNullOrWhiteSpace(sComment))
+                        {
+                            <div class="revision-box">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                <strong>Yêu cầu chỉnh sửa:</strong> @sComment
+                            </div>
+                        }
+                        else if (sub.Status == "Approved" && !string.IsNullOrWhiteSpace(sComment))
+                        {
+                            <div class="comment-box">
+                                <i class="bi bi-person-check me-1"></i>
+                                <strong>Nhận xét:</strong> @sComment
+                            </div>
+                        }
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+                        @if (sub.Status == "Approved")
+                        {
+                            <span class="badge-approved"><i class="bi bi-check-circle-fill"></i> Đạt</span>
+                        }
+                        else if (sub.Status == "NeedsRevision")
+                        {
+                            <span class="badge-needs-revision"><i class="bi bi-arrow-repeat"></i> Cần sửa lại</span>
+                        }
+                        else
+                        {
+                            <span class="badge-pending"><i class="bi bi-hourglass-split"></i> Chờ duyệt</span>
+                        }
+                        <a href="@sFilePath" download="@sFileName" class="btn-download">
+                            <i class="bi bi-download"></i> Tải xuống
+                        </a>
+                    </div>
+                </div>
+
+                @* Form duyệt — chỉ hiện khi Pending *@
+                @if (sub.Status == "Pending")
+                {
+                    <form asp-controller="Tasks" asp-action="ReviewSubmission" method="post" class="review-form">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="submissionId" value="@sIdStr" />
+                        <input type="text" name="reviewComment" class="review-input"
+                               placeholder="Nhận xét / hướng dẫn chỉnh sửa..." />
+                        <button type="submit" name="reviewResult" value="Approved" class="btn-approve">
+                            <i class="bi bi-check-circle"></i> Đạt
+                        </button>
+                        <button type="submit" name="reviewResult" value="NeedsRevision" class="btn-reject">
+                            <i class="bi bi-arrow-repeat"></i> Yêu cầu sửa lại
+                        </button>
+                    </form>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-state">
+            <div style="font-size:36px; margin-bottom:10px;">
+                @(filter == "pending" ? "📭" : filter == "approved" ? "✅" : "🔄")
+            </div>
+            <div style="font-weight:700; color:#475569;">
+                @(filter == "pending"       ? "Không có bài nộp nào chờ duyệt"
+                : filter == "approved"      ? "Chưa có bài nộp nào được duyệt đạt"
+                :                            "Chưa có bài nộp nào cần sửa lại")
+            </div>
+        </div>
+    }
+</div>

@@ -1,0 +1,302 @@
+﻿@model IEnumerable<TaskManagement.Web.Models.Document>
+@using TaskManagement.Web.Models
+
+@{
+    ViewData["Title"] = "Tài liệu nhóm";
+    var uploaderNames = ViewBag.UploaderNames as Dictionary<int, string> ?? new Dictionary<int, string>();
+    var allUsers      = ViewBag.AllUsers as List<User> ?? new List<User>();
+    string search     = ViewBag.Search ?? "";
+    string fileType   = ViewBag.FileType ?? "";
+    string uploadedBy = ViewBag.UploadedBy ?? "";
+}
+
+<style>
+    .page-heading { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0; }
+    .page-subheading { font-size: 14px; color: #64748b; margin: 4px 0 0; }
+
+    .section-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; margin-bottom: 20px; }
+    .section-header { padding: 18px 22px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
+    .section-header h5 { font-size: 15px; font-weight: 700; margin: 0; }
+    .section-header p  { font-size: 12px; color: #94a3b8; margin: 2px 0 0; }
+    .section-body { padding: 20px 22px; }
+
+    .upload-zone { border: 2px dashed #e2e8f0; border-radius: 12px; padding: 24px; text-align: center; background: #f8fafc; transition: all .2s; cursor: pointer; position: relative; }
+    .upload-zone:hover { border-color: #6366f1; background: rgba(99,102,241,0.03); }
+    .upload-zone.dragover { border-color: #6366f1; background: rgba(99,102,241,0.06); }
+    .upload-icon { font-size: 28px; color: #94a3b8; margin-bottom: 8px; }
+    .upload-text { font-size: 14px; color: #475569; font-weight: 500; }
+    .upload-hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    .file-input-hidden { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .selected-file { display: none; align-items: center; gap: 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; margin-top: 10px; font-size: 13px; color: #1e40af; font-weight: 500; }
+    .selected-file.show { display: flex; }
+
+    .field-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #475569; margin-bottom: 7px; display: block; }
+    .field-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 9px; padding: 10px 14px; font-size: 14px; font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; background: #f8fafc; transition: all .2s; outline: none; }
+    .field-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); background: #fff; }
+
+    .btn-primary-custom { background: #6366f1; color: white; border: none; border-radius: 8px; padding: 10px 20px; font-size: 13.5px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: background .2s, transform .15s; text-decoration: none; }
+    .btn-primary-custom:hover { background: #4f46e5; color: white; transform: translateY(-1px); }
+
+    .doc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+
+    .doc-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; transition: all .2s; position: relative; }
+    .doc-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-color: #c7d2fe; transform: translateY(-2px); }
+
+    .doc-icon { font-size: 32px; margin-bottom: 12px; }
+    .doc-title { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 5px; }
+    .doc-desc  { font-size: 13px; color: #64748b; margin-bottom: 12px; line-height: 1.5; }
+    .doc-meta  { font-size: 11px; color: #94a3b8; display: flex; flex-direction: column; gap: 3px; margin-bottom: 14px; }
+    .doc-meta span { display: flex; align-items: center; gap: 5px; }
+
+    .doc-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .btn-download { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: all .15s; }
+    .btn-download:hover { background: #dbeafe; }
+
+    .btn-versions { background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: all .15s; }
+    .btn-versions:hover { background: #ede9fe; }
+
+    .btn-delete-sm { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 7px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all .15s; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .btn-delete-sm:hover { background: #fee2e2; }
+
+    .version-badge { display: inline-flex; align-items: center; background: #f1f5f9; color: #475569; border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+
+    .file-size { font-size: 11px; color: #94a3b8; }
+
+    .empty-state { text-align: center; padding: 48px 20px; color: #94a3b8; }
+
+    .alert-success-custom { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+    .alert-error-custom   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+
+    /* Search & Filter */
+    .filter-bar { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 20px; margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .search-input-wrap { flex: 1; min-width: 200px; position: relative; }
+    .search-input-wrap i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 15px; }
+    .search-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 9px; padding: 9px 12px 9px 36px; font-size: 14px; font-family: 'Plus Jakarta Sans', sans-serif; outline: none; background: #f8fafc; }
+    .search-input:focus { border-color: #6366f1; background: #fff; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+    .filter-select { border: 1px solid #e2e8f0; border-radius: 9px; padding: 9px 13px; font-size: 13.5px; font-family: 'Plus Jakarta Sans', sans-serif; outline: none; background: #f8fafc; color: #0f172a; cursor: pointer; }
+    .filter-select:focus { border-color: #6366f1; }
+    .btn-filter { background: #6366f1; color: white; border: none; border-radius: 9px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-filter:hover { background: #4f46e5; }
+    .btn-clear { background: #f1f5f9; color: #475569; border: none; border-radius: 9px; padding: 9px 14px; font-size: 13.5px; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+    .btn-clear:hover { background: #e2e8f0; color: #0f172a; }
+    .result-count { font-size: 13px; color: #64748b; font-weight: 500; }
+</style>
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="page-heading">Tài liệu nhóm</h1>
+        <p class="page-subheading">Chia sẻ và quản lý tài liệu chung cho cả nhóm</p>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert-success-custom"><i class="bi bi-check-circle-fill"></i> @TempData["SuccessMessage"]</div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert-error-custom"><i class="bi bi-exclamation-circle-fill"></i> @TempData["ErrorMessage"]</div>
+}
+
+<!-- Form Upload -->
+<div class="section-card">
+    <div class="section-header">
+        <div>
+            <h5><i class="bi bi-cloud-upload me-2" style="color:#6366f1;"></i>Upload tài liệu mới</h5>
+            <p>Chia sẻ tài liệu với toàn bộ thành viên trong nhóm</p>
+        </div>
+    </div>
+    <div class="section-body">
+        <form asp-action="Upload" asp-controller="Documents" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <div class="row g-3">
+                <div class="col-lg-12">
+                    <label class="field-label">Chọn file</label>
+                    <div class="upload-zone" id="uploadZone">
+                        <input type="file" name="file" class="file-input-hidden" id="fileInput" onchange="onFileSelected(this)" />
+                        <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+                        <div class="upload-text">Kéo thả file vào đây hoặc <span style="color:#6366f1;font-weight:700;">click để chọn</span></div>
+                        <div class="upload-hint">Hỗ trợ tất cả loại file — tối đa 20MB</div>
+                    </div>
+                    <div class="selected-file" id="selectedFileInfo">
+                        <i class="bi bi-file-earmark-check" style="font-size:18px;"></i>
+                        <span id="selectedFileName"></span>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <label class="field-label">Tên tài liệu</label>
+                    <input type="text" name="title" class="field-input" placeholder="Ví dụ: Báo cáo tiến độ tuần 1" required />
+                </div>
+
+                <div class="col-lg-6">
+                    <label class="field-label">Mô tả (tùy chọn)</label>
+                    <input type="text" name="description" class="field-input" placeholder="Mô tả ngắn về tài liệu..." />
+                </div>
+
+                <div class="col-12">
+                    <button type="submit" class="btn-primary-custom">
+                        <i class="bi bi-cloud-upload"></i> Upload tài liệu
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Filter bar -->
+<form method="get" asp-action="Index" asp-controller="Documents">
+    <div class="filter-bar">
+        <div class="search-input-wrap">
+            <i class="bi bi-search"></i>
+            <input type="text" name="search" class="search-input" placeholder="Tìm theo tên, mô tả, tên file..." value="@search" />
+        </div>
+        <select name="fileType" class="filter-select">
+            <option value="">Tất cả loại file</option>
+            @if (fileType == "word")  { <option value="word"  selected="selected">📝 Word (.doc/.docx)</option> }
+            else                      { <option value="word" >📝 Word (.doc/.docx)</option> }
+            @if (fileType == "excel") { <option value="excel" selected="selected">📊 Excel (.xls/.xlsx)</option> }
+            else                      { <option value="excel">📊 Excel (.xls/.xlsx)</option> }
+            @if (fileType == "pdf")   { <option value="pdf"   selected="selected">📄 PDF</option> }
+            else                      { <option value="pdf"  >📄 PDF</option> }
+            @if (fileType == "zip")   { <option value="zip"   selected="selected">🗜️ ZIP/RAR</option> }
+            else                      { <option value="zip"  >🗜️ ZIP/RAR</option> }
+        </select>
+        <select name="uploadedBy" class="filter-select">
+            <option value="">Tất cả thành viên</option>
+            @foreach (var u in allUsers)
+            {
+                if (uploadedBy == u.UserId.ToString())
+                {
+                    <option value="@u.UserId" selected="selected">@u.FullName</option>
+                }
+                else
+                {
+                    <option value="@u.UserId">@u.FullName</option>
+                }
+            }
+        </select>
+        <button type="submit" class="btn-filter"><i class="bi bi-funnel"></i> Lọc</button>
+        @if (!string.IsNullOrWhiteSpace(search) || !string.IsNullOrWhiteSpace(fileType) || !string.IsNullOrWhiteSpace(uploadedBy))
+        {
+            <a asp-action="Index" asp-controller="Documents" class="btn-clear"><i class="bi bi-x"></i> Xóa lọc</a>
+        }
+    </div>
+</form>
+
+<!-- Danh sách tài liệu -->
+<div class="section-card">
+    <div class="section-header">
+        <div>
+            <h5><i class="bi bi-folder2-open me-2" style="color:#6366f1;"></i>Danh sách tài liệu</h5>
+            <p>
+                @Model.Count() tài liệu
+                @if (!string.IsNullOrWhiteSpace(search) || !string.IsNullOrWhiteSpace(fileType) || !string.IsNullOrWhiteSpace(uploadedBy))
+                {
+                    <span style="color:#6366f1;"> (đang lọc)</span>
+                }
+            </p>
+        </div>
+    </div>
+    <div class="section-body">
+        @if (Model.Any())
+        {
+            <div class="doc-grid">
+                @foreach (var doc in Model)
+                {
+                    var uploaderName = uploaderNames.ContainsKey(doc.UploadedBy) ? uploaderNames[doc.UploadedBy] : "Không xác định";
+                    var docFileName = doc.FileName ?? "";
+                    var dotIndex = docFileName.LastIndexOf('.');
+                    var ext = dotIndex >= 0 ? docFileName.Substring(dotIndex).ToLower() : "";
+
+                    var docIcon = "";
+                    if (ext == ".pdf") docIcon = "📄";
+                    else if (ext == ".doc" || ext == ".docx") docIcon = "📝";
+                    else if (ext == ".xls" || ext == ".xlsx") docIcon = "📊";
+                    else if (ext == ".zip" || ext == ".rar") docIcon = "🗜️";
+                    else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") docIcon = "🖼️";
+                    else docIcon = "📁";
+
+                    var fileSizeStr = doc.FileSize < 1024 ? doc.FileSize + " B"
+                                   : doc.FileSize < 1024 * 1024 ? (doc.FileSize / 1024) + " KB"
+                                   : (doc.FileSize / (1024 * 1024)) + " MB";
+
+                    var docIdStr = doc.DocumentId.ToString();
+                    var docGroupId = (doc.GroupId ?? doc.DocumentId).ToString();
+                    var docFilePath = doc.FilePath ?? "";
+                    var docTitle = doc.Title ?? "";
+
+                    <div class="doc-card">
+                        <div class="doc-icon">@docIcon</div>
+                        <div class="doc-title">@docTitle</div>
+                        @if (!string.IsNullOrWhiteSpace(doc.Description))
+                        {
+                            <div class="doc-desc">@doc.Description</div>
+                        }
+                        <div class="doc-meta">
+                            <span><i class="bi bi-person"></i> @uploaderName</span>
+                            <span><i class="bi bi-clock"></i> @doc.UploadedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                            <span><i class="bi bi-hdd"></i> @fileSizeStr</span>
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <span class="version-badge">v@(doc.Version)</span>
+                        </div>
+                        <div class="doc-actions">
+                            <a href="@docFilePath" download="@docFileName" class="btn-download">
+                                <i class="bi bi-download"></i> Tải xuống
+                            </a>
+                            <a asp-action="Versions" asp-controller="Documents" asp-route-groupId="@docGroupId" class="btn-versions">
+                                <i class="bi bi-clock-history"></i> Phiên bản
+                            </a>
+                            @if (User.IsInRole("Admin") || doc.UploadedBy == int.Parse(User.FindFirst("UserId")!.Value))
+                            {
+                                <form asp-action="Delete" asp-controller="Documents" method="post" style="display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="documentId" value="@docIdStr" />
+                                    <button type="submit" class="btn-delete-sm" onclick="return confirm('Xóa tài liệu này?')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="empty-state">
+                <div style="font-size:40px; margin-bottom:12px;">📂</div>
+                <div style="font-weight:700; color:#475569; margin-bottom:6px;">Chưa có tài liệu nào</div>
+                <div style="font-size:13.5px;">Hãy upload tài liệu đầu tiên cho nhóm!</div>
+            </div>
+        }
+    </div>
+</div>
+
+<script>
+    function onFileSelected(input) {
+        const info = document.getElementById('selectedFileInfo');
+        const name = document.getElementById('selectedFileName');
+        if (input.files && input.files[0]) {
+            name.textContent = input.files[0].name;
+            info.classList.add('show');
+        } else {
+            info.classList.remove('show');
+        }
+    }
+    const zone = document.getElementById('uploadZone');
+    if (zone) {
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+        zone.addEventListener('drop', e => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            const fi = document.getElementById('fileInput');
+            fi.files = e.dataTransfer.files;
+            onFileSelected(fi);
+        });
+    }
+</script>

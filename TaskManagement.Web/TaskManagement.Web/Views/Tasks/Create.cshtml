@@ -1,0 +1,191 @@
+﻿@model TaskManagement.Web.Models.TaskItem
+
+@{
+    ViewData["Title"] = "Tạo công việc";
+}
+
+<style>
+    .form-page-wrapper { max-width: 780px; margin: 0 auto; }
+    .form-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
+    .form-card-header { padding: 24px 28px 20px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 14px; }
+    .form-icon { width: 44px; height: 44px; background: rgba(99,102,241,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #6366f1; flex-shrink: 0; }
+    .form-card-title { font-size: 18px; font-weight: 800; color: #0f172a; margin: 0; }
+    .form-card-subtitle { font-size: 13px; color: #94a3b8; margin: 3px 0 0; }
+    .form-card-body { padding: 26px 28px; }
+    .field-label { font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 7px; display: block; }
+    .field-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 9px; padding: 10px 14px; font-size: 14px; font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; background: #f8fafc; transition: all .2s; outline: none; }
+    .field-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); background: #fff; }
+    .field-input.lg { padding: 12px 14px; font-size: 15px; font-weight: 500; }
+    textarea.field-input { resize: vertical; min-height: 110px; }
+    .field-error { font-size: 12px; color: #ef4444; margin-top: 5px; font-weight: 500; }
+    .form-divider { height: 1px; background: #f1f5f9; margin: 24px 0; }
+    .form-section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 16px; }
+    .btn-submit { background: #6366f1; color: white; border: none; border-radius: 9px; padding: 11px 24px; font-size: 14px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; transition: background .2s, transform .15s; }
+    .btn-submit:hover { background: #4f46e5; transform: translateY(-1px); }
+    .btn-back { background: transparent; color: #475569; border: 1px solid #e2e8f0; border-radius: 9px; padding: 11px 22px; font-size: 14px; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; transition: all .2s; }
+    .btn-back:hover { background: #f8fafc; border-color: #94a3b8; color: #0f172a; }
+
+    /* Multi-select người nhận */
+    .assignee-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .assignee-chip { display: flex; align-items: center; gap: 6px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 20px; padding: 4px 12px; font-size: 13px; font-weight: 600; color: #1e40af; }
+    .assignee-chip button { background: none; border: none; color: #6366f1; cursor: pointer; padding: 0; font-size: 14px; line-height: 1; }
+    .assignee-chip button:hover { color: #ef4444; }
+    .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #1e40af; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+</style>
+
+<div class="form-page-wrapper">
+    <div class="form-card">
+        <div class="form-card-header">
+            <div class="form-icon"><i class="bi bi-plus-circle"></i></div>
+            <div>
+                <div class="form-card-title">Tạo công việc mới</div>
+                <div class="form-card-subtitle">Nhập thông tin để thêm công việc vào hệ thống</div>
+            </div>
+        </div>
+
+        <div class="form-card-body">
+            <form asp-action="Create" method="post" id="createForm">
+                @Html.AntiForgeryToken()
+
+                <div class="form-section-label">Thông tin cơ bản</div>
+
+                <div class="mb-4">
+                    <label asp-for="Title" class="field-label">Tiêu đề *</label>
+                    <input asp-for="Title" class="field-input lg" placeholder="Ví dụ: Thiết kế giao diện trang dashboard" />
+                    <span asp-validation-for="Title" class="field-error"></span>
+                </div>
+
+                <div class="mb-4">
+                    <label asp-for="Description" class="field-label">Mô tả</label>
+                    <textarea asp-for="Description" class="field-input" placeholder="Mô tả chi tiết công việc, yêu cầu và các bước thực hiện..."></textarea>
+                </div>
+
+                <div class="form-divider"></div>
+                <div class="form-section-label">Nhóm & Phân công</div>
+
+                <div class="mb-4">
+                    <label class="field-label">Nhóm / Dự án *</label>
+                    <select asp-for="GroupId" asp-items="ViewBag.Groups" class="field-input" required>
+                        <option value="">-- Chọn nhóm --</option>
+                    </select>
+                    <div style="font-size:12px; color:#94a3b8; margin-top:5px;">
+                        <i class="bi bi-info-circle"></i> Chỉ hiện nhóm bạn là Trưởng nhóm
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="field-label">Người thực hiện</label>
+                    <div class="info-box">
+                        <i class="bi bi-people-fill"></i>
+                        Có thể giao cho nhiều người cùng thực hiện một công việc
+                    </div>
+                    <div class="d-flex gap-2 mb-2">
+                        <select id="assigneeSelect" class="field-input">
+                            <option value="">-- Chọn người được giao --</option>
+                            @foreach (var u in ViewBag.Users as Microsoft.AspNetCore.Mvc.Rendering.SelectList ?? new Microsoft.AspNetCore.Mvc.Rendering.SelectList(new List<object>()))
+                            {
+                                <option value="@u.Value">@u.Text</option>
+                            }
+                        </select>
+                        <button type="button" onclick="addAssignee()"
+                            style="background:#6366f1; color:white; border:none; border-radius:9px; padding:0 16px; font-size:20px; cursor:pointer; flex-shrink:0;">+</button>
+                    </div>
+                    <div class="assignee-list" id="assigneeList"></div>
+                    <div id="assigneeInputs"></div>
+                    <div style="font-size:12px; color:#94a3b8; margin-top:6px;" id="assigneeHint">Chưa chọn người nào</div>
+                </div>
+
+                <div class="form-divider"></div>
+                <div class="form-section-label">Chi tiết</div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label asp-for="Priority" class="field-label">Mức ưu tiên</label>
+                        <select asp-for="Priority" class="field-input">
+                            <option value="Low">🟢 Thấp</option>
+                            <option value="Medium" selected>🟡 Trung bình</option>
+                            <option value="High">🔴 Cao</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="Deadline" class="field-label">Hạn hoàn thành *</label>
+                        <input asp-for="Deadline" type="datetime-local" class="field-input" required />
+                    </div>
+                </div>
+
+                <!-- Status luôn là Todo khi tạo mới — không cho chọn -->
+                <input type="hidden" asp-for="Status" value="Todo" />
+
+                <div class="form-divider"></div>
+                <div class="d-flex gap-3">
+                    <button type="submit" class="btn-submit">
+                        <i class="bi bi-check2"></i> Lưu công việc
+                    </button>
+                    <a asp-action="Index" class="btn-back">
+                        <i class="bi bi-arrow-left"></i> Quay lại
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const selectedAssignees = {}; // { userId: userName }
+
+    function addAssignee() {
+        const select = document.getElementById('assigneeSelect');
+        const userId = select.value;
+        const userName = select.options[select.selectedIndex].text;
+
+        if (!userId) return;
+        if (selectedAssignees[userId]) {
+            alert('Người này đã được chọn!');
+            return;
+        }
+
+        selectedAssignees[userId] = userName;
+        renderAssignees();
+        select.value = '';
+    }
+
+    function removeAssignee(userId) {
+        delete selectedAssignees[userId];
+        renderAssignees();
+    }
+
+    function renderAssignees() {
+        const list = document.getElementById('assigneeList');
+        const inputs = document.getElementById('assigneeInputs');
+        const hint = document.getElementById('assigneeHint');
+
+        list.innerHTML = '';
+        inputs.innerHTML = '';
+
+        const ids = Object.keys(selectedAssignees);
+
+        ids.forEach(uid => {
+            // Chip hiển thị
+            const chip = document.createElement('div');
+            chip.className = 'assignee-chip';
+            chip.innerHTML = `<i class="bi bi-person"></i> ${selectedAssignees[uid]}
+                <button type="button" onclick="removeAssignee('${uid}')">×</button>`;
+            list.appendChild(chip);
+
+            // Hidden input để submit
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'assigneeIds';
+            input.value = uid;
+            inputs.appendChild(input);
+        });
+
+        hint.textContent = ids.length > 0
+            ? `Đã chọn ${ids.length} người`
+            : 'Chưa chọn người nào';
+    }
+</script>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}

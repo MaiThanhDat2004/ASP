@@ -1,0 +1,352 @@
+﻿@{
+    ViewData["Title"] = "Lịch công việc";
+    var tasks     = ViewBag.Tasks as List<TaskManagement.Web.Models.TaskItem> ?? new();
+    var userDict  = ViewBag.UserDict as Dictionary<int, string> ?? new();
+    var now       = DateTime.Now;
+}
+
+<style>
+    .page-heading { font-size: 22px; font-weight: 800; color: #0f172a; margin: 0; }
+    .page-sub     { font-size: 14px; color: #64748b; margin: 4px 0 0; }
+
+    .cal-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
+    .cal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid #f1f5f9; }
+    .cal-month { font-size: 18px; font-weight: 800; color: #0f172a; }
+    .cal-nav { display: flex; gap: 6px; }
+    .cal-nav-btn { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 15px; color: #475569; transition: all .15s; }
+    .cal-nav-btn:hover { background: #6366f1; color: white; border-color: #6366f1; }
+
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .cal-dow { text-align: center; padding: 12px 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; border-bottom: 1px solid #f1f5f9; }
+    .cal-dow.weekend { color: #ef4444; }
+
+    .cal-cell { min-height: 110px; border-right: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; padding: 8px; position: relative; transition: background .15s; }
+    .cal-cell:nth-child(7n) { border-right: none; }
+    .cal-cell.other-month { background: #fafafa; }
+    .cal-cell.today { background: #fafafe; }
+    .cal-cell.today .cal-date { background: #6366f1; color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-weight: 800; }
+    .cal-cell:hover { background: #f8faff; }
+
+    .cal-date { font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 4px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
+    .cal-date.other { color: #cbd5e1; }
+    .cal-date.weekend { color: #ef4444; }
+
+    .task-chip { display: block; border-radius: 5px; padding: 2px 7px; font-size: 11px; font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: opacity .15s; text-decoration: none; }
+    .task-chip:hover { opacity: .8; }
+    .chip-todo   { background: #f1f5f9; color: #475569; }
+    .chip-doing  { background: #dbeafe; color: #1e40af; }
+    .chip-done   { background: #d1fae5; color: #065f46; }
+    .chip-overdue { background: #fee2e2; color: #991b1b; }
+
+    .more-chip { font-size: 11px; color: #6366f1; font-weight: 700; cursor: pointer; padding: 1px 4px; }
+    .more-chip:hover { text-decoration: underline; }
+
+    /* Legend */
+    .legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 14px 24px; border-top: 1px solid #f1f5f9; background: #f8fafc; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #475569; font-weight: 500; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+    /* Sidebar task list */
+    .task-sidebar { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
+    .task-sidebar-header { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; font-size: 15px; font-weight: 700; color: #0f172a; display: flex; align-items: center; justify-content: space-between; }
+    .task-sidebar-item { padding: 12px 20px; border-bottom: 1px solid #f8fafc; display: flex; align-items: flex-start; gap: 10px; text-decoration: none; color: inherit; transition: background .15s; }
+    .task-sidebar-item:hover { background: #fafafe; }
+    .task-sidebar-item:last-child { border-bottom: none; }
+    .task-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+    .task-sidebar-title { font-size: 13.5px; font-weight: 600; color: #0f172a; margin-bottom: 3px; }
+    .task-sidebar-meta  { font-size: 11px; color: #94a3b8; }
+    .cal-cell.selected { background: #eff6ff !important; outline: 2px solid #6366f1; outline-offset: -2px; border-radius: 4px; }
+    .sidebar-empty { padding: 24px 20px; text-align: center; color: #94a3b8; font-size: 13px; }
+
+    /* Tooltip */
+    .task-tooltip { position: fixed; z-index: 9999; background: #1e293b; color: white; border-radius: 10px; padding: 10px 14px; font-size: 12.5px; pointer-events: none; display: none; max-width: 240px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+    .task-tooltip.show { display: block; }
+</style>
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="page-heading">Lịch công việc</h1>
+        <p class="page-sub">Xem deadline các công việc theo lịch</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-9">
+        <div class="cal-wrap">
+            <div class="cal-header">
+                <div class="cal-month" id="calMonthLabel"></div>
+                <div class="cal-nav">
+                    <button class="cal-nav-btn" onclick="changeMonth(-1)"><i class="bi bi-chevron-left"></i></button>
+                    <button class="cal-nav-btn" onclick="goToday()" style="width:auto; padding:0 12px; font-size:12px; font-weight:700;">Hôm nay</button>
+                    <button class="cal-nav-btn" onclick="changeMonth(1)"><i class="bi bi-chevron-right"></i></button>
+                </div>
+            </div>
+
+            <!-- Day of week headers -->
+            <div class="cal-grid" id="calDow">
+                <div class="cal-dow">T2</div>
+                <div class="cal-dow">T3</div>
+                <div class="cal-dow">T4</div>
+                <div class="cal-dow">T5</div>
+                <div class="cal-dow">T6</div>
+                <div class="cal-dow weekend">T7</div>
+                <div class="cal-dow weekend">CN</div>
+            </div>
+
+            <div class="cal-grid" id="calBody"></div>
+
+            <div class="legend">
+                <div class="legend-item"><div class="legend-dot" style="background:#94a3b8;"></div> Chưa làm</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div> Đang làm</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#10b981;"></div> Hoàn thành</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div> Quá hạn</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar: click ngày hoặc upcoming -->
+    <div class="col-lg-3">
+        <div class="task-sidebar">
+            <div class="task-sidebar-header">
+                <span id="sidebarTitle"><i class="bi bi-clock me-2" style="color:#6366f1;"></i>Sắp đến hạn</span>
+                <button id="sidebarResetBtn" onclick="resetSidebar()"
+                    style="display:none; background:none; border:none; font-size:12px; color:#6366f1; font-weight:700; cursor:pointer;">
+                    <i class="bi bi-x"></i> Xóa chọn
+                </button>
+            </div>
+            <div id="sidebarContent">
+                @{
+                    var upcoming = tasks
+                        .Where(t => t.Status != "Done" && t.Deadline >= now)
+                        .OrderBy(t => t.Deadline)
+                        .Take(10)
+                        .ToList();
+                }
+                @if (upcoming.Any())
+                {
+                    @foreach (var t in upcoming)
+                    {
+                        var dotColor = t.Status == "Doing" ? "#3b82f6" : "#94a3b8";
+                        var assignedName = t.AssignedTo.HasValue && userDict.ContainsKey(t.AssignedTo.Value)
+                            ? userDict[t.AssignedTo.Value] : "Chưa giao";
+                        var daysLeft = (t.Deadline - now).Days;
+                        var daysStr = daysLeft == 0 ? "Hôm nay" : daysLeft == 1 ? "Ngày mai" : $"{daysLeft} ngày nữa";
+                        <a asp-controller="Tasks" asp-action="Details" asp-route-id="@t.TaskId" class="task-sidebar-item">
+                            <div class="task-dot" style="background:@dotColor;"></div>
+                            <div>
+                                <div class="task-sidebar-title">@t.Title</div>
+                                <div class="task-sidebar-meta">
+                                    <i class="bi bi-calendar3"></i> @t.Deadline.ToString("dd/MM") &nbsp;·&nbsp;
+                                    <span style="color:@(daysLeft <= 1 ? "#ef4444" : "#94a3b8");">@daysStr</span>
+                                </div>
+                            </div>
+                        </a>
+                    }
+                }
+                else
+                {
+                    <div class="sidebar-empty">✅ Không có task sắp đến hạn</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tooltip -->
+<div class="task-tooltip" id="taskTooltip"></div>
+
+<script>
+    // Dữ liệu task từ server
+    const tasks = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(tasks.Select(t => new {
+        id        = t.TaskId,
+        title     = t.Title,
+        status    = t.Status,
+        deadline  = t.Deadline.ToString("yyyy-MM-dd"),
+        priority  = t.Priority,
+        assignedTo = t.AssignedTo.HasValue && userDict.ContainsKey(t.AssignedTo.Value)
+                     ? userDict[t.AssignedTo.Value] : "Chưa giao",
+        isOverdue  = t.Deadline < DateTime.Now && t.Status != "Done"
+    })));
+
+    const today = new Date();
+    let curYear  = today.getFullYear();
+    let curMonth = today.getMonth(); // 0-based
+
+    const monthNames = ['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6',
+                        'Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
+
+    function renderCalendar() {
+        document.getElementById('calMonthLabel').textContent =
+            `${monthNames[curMonth]} ${curYear}`;
+
+        const firstDay = new Date(curYear, curMonth, 1);
+        const lastDay  = new Date(curYear, curMonth + 1, 0);
+
+        // Monday=0 offset
+        let startDow = firstDay.getDay(); // 0=Sun
+        startDow = startDow === 0 ? 6 : startDow - 1; // Convert to Mon=0
+
+        const cells = [];
+        // Previous month padding
+        for (let i = startDow - 1; i >= 0; i--) {
+            const d = new Date(curYear, curMonth, -i);
+            cells.push({ date: d, otherMonth: true });
+        }
+        // Current month
+        for (let d = 1; d <= lastDay.getDate(); d++) {
+            cells.push({ date: new Date(curYear, curMonth, d), otherMonth: false });
+        }
+        // Next month padding
+        const remaining = 42 - cells.length;
+        for (let d = 1; d <= remaining; d++) {
+            cells.push({ date: new Date(curYear, curMonth + 1, d), otherMonth: true });
+        }
+
+        const body = document.getElementById('calBody');
+        body.innerHTML = '';
+
+        cells.forEach(cell => {
+            const dateStr = cell.date.toISOString().split('T')[0];
+            const isToday = dateStr === today.toISOString().split('T')[0];
+            const dow = cell.date.getDay(); // 0=Sun, 6=Sat
+            const isWeekend = dow === 0 || dow === 6;
+
+            const dayTasks = tasks.filter(t => t.deadline === dateStr);
+
+            const el = document.createElement('div');
+            el.className = `cal-cell${cell.otherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}`;
+            el._dateStr = dateStr;
+
+            let dateClass = 'cal-date';
+            if (cell.otherMonth) dateClass += ' other';
+            else if (isWeekend) dateClass += ' weekend';
+
+            let html = `<div class="${dateClass}">${cell.date.getDate()}</div>`;
+
+            const maxShow = 3;
+            dayTasks.slice(0, maxShow).forEach(t => {
+                const chipClass = t.isOverdue ? 'chip-overdue'
+                                : t.status === 'Done'  ? 'chip-done'
+                                : t.status === 'Doing' ? 'chip-doing'
+                                : 'chip-todo';
+                html += `<a href="/Tasks/Details/${t.id}" class="task-chip ${chipClass}"
+                    onmouseenter="showTooltip(event, '${escHtml(t.title)}', '${t.assignedTo}', '${t.status}', '${t.priority}')"
+                    onmouseleave="hideTooltip()">${escHtml(t.title)}</a>`;
+            });
+
+            if (dayTasks.length > maxShow) {
+                html += `<span class="more-chip">+${dayTasks.length - maxShow} nữa</span>`;
+            }
+
+            el.innerHTML = html;
+
+            // Click vào ô ngày → hiện task ngày đó ở sidebar
+            el.addEventListener('click', function(e) {
+                if (e.target.closest('a')) return;
+                selectDay(dateStr, cell.date);
+            });
+            el.style.cursor = 'pointer';
+
+            body.appendChild(el);
+        });
+    }
+
+    let selectedDateStr = null;
+
+    function selectDay(dateStr, dateObj) {
+        // Bỏ chọn ô cũ
+        document.querySelectorAll('.cal-cell.selected').forEach(el => el.classList.remove('selected'));
+
+        // Highlight ô được chọn
+        document.querySelectorAll('.cal-cell').forEach(cell => {
+            if (cell._dateStr === dateStr) cell.classList.add('selected');
+        });
+
+        selectedDateStr = dateStr;
+        const dayTasks = tasks.filter(t => t.deadline === dateStr);
+
+        const title    = document.getElementById('sidebarTitle');
+        const content  = document.getElementById('sidebarContent');
+        const resetBtn = document.getElementById('sidebarResetBtn');
+
+        const label = `${String(dateObj.getDate()).padStart(2,'0')}/${String(dateObj.getMonth()+1).padStart(2,'0')}/${dateObj.getFullYear()}`;
+        title.innerHTML = `<i class="bi bi-calendar3 me-2" style="color:#6366f1;"></i>Ngày ${label}`;
+        resetBtn.style.display = 'block';
+
+        if (dayTasks.length === 0) {
+            content.innerHTML = '<div class="sidebar-empty">📭 Không có công việc nào ngày này</div>';
+            return;
+        }
+
+        content.innerHTML = dayTasks.map(t => {
+            const dotColor = t.isOverdue ? '#ef4444'
+                           : t.status === 'Done'  ? '#10b981'
+                           : t.status === 'Doing' ? '#3b82f6' : '#94a3b8';
+            const statusLabel = t.isOverdue       ? '⚠️ Quá hạn'
+                              : t.status === 'Done'  ? '✅ Hoàn thành'
+                              : t.status === 'Doing' ? '🔄 Đang làm' : '⭕ Chưa làm';
+            return `<a href="/Tasks/Details/${t.id}" class="task-sidebar-item">
+                <div class="task-dot" style="background:${dotColor}; margin-top:5px; flex-shrink:0;"></div>
+                <div>
+                    <div class="task-sidebar-title">${escHtml(t.title)}</div>
+                    <div class="task-sidebar-meta">${statusLabel} · ${t.priority}</div>
+                    <div class="task-sidebar-meta">👤 ${t.assignedTo}</div>
+                </div>
+            </a>`;
+        }).join('');
+    }
+
+    function resetSidebar() {
+        selectedDateStr = null;
+        document.querySelectorAll('.cal-cell.selected').forEach(el => el.classList.remove('selected'));
+        document.getElementById('sidebarTitle').innerHTML = '<i class="bi bi-clock me-2" style="color:#6366f1;"></i>Sắp đến hạn';
+        document.getElementById('sidebarResetBtn').style.display = 'none';
+        location.reload();
+    }
+
+    function changeMonth(delta) {
+        curMonth += delta;
+        if (curMonth > 11) { curMonth = 0; curYear++; }
+        if (curMonth < 0)  { curMonth = 11; curYear--; }
+        renderCalendar();
+    }
+
+    function goToday() {
+        curYear  = today.getFullYear();
+        curMonth = today.getMonth();
+        renderCalendar();
+    }
+
+    function escHtml(str) {
+        return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    function showTooltip(e, title, assignedTo, status, priority) {
+        const t = document.getElementById('taskTooltip');
+        const statusLabel = status === 'Done' ? '✅ Hoàn thành'
+                          : status === 'Doing' ? '🔄 Đang làm' : '⭕ Chưa làm';
+        t.innerHTML = `<div style="font-weight:700; margin-bottom:5px;">${title}</div>
+            <div style="color:#94a3b8; font-size:11.5px;">👤 ${assignedTo}</div>
+            <div style="color:#94a3b8; font-size:11.5px;">📌 ${statusLabel} · ${priority}</div>`;
+        t.classList.add('show');
+        moveTooltip(e);
+    }
+
+    function moveTooltip(e) {
+        const t = document.getElementById('taskTooltip');
+        t.style.left = (e.clientX + 14) + 'px';
+        t.style.top  = (e.clientY - 10) + 'px';
+    }
+
+    function hideTooltip() {
+        document.getElementById('taskTooltip').classList.remove('show');
+    }
+
+    document.addEventListener('mousemove', e => {
+        const t = document.getElementById('taskTooltip');
+        if (t.classList.contains('show')) moveTooltip(e);
+    });
+
+    renderCalendar();
+</script>
